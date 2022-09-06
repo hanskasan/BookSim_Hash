@@ -54,6 +54,10 @@ BatchTrafficManager::BatchTrafficManager( const Configuration &config,
   } else {
     _sent_packets_out = new ofstream(sent_packets_out_file.c_str());
   }
+
+  // HANS: Additionals
+  _active_nodes = config.GetInt("active_nodes");
+  if (_active_nodes < 0)  _active_nodes = gC;
 }
 
 BatchTrafficManager::~BatchTrafficManager( )
@@ -77,28 +81,33 @@ int BatchTrafficManager::_IssuePacket( int source, int cl )
     //check to make sure it is on time yet
     if(!_repliesPending[source].empty()) {
       if(_repliesPending[source].front()->time <= _time) {
-	result = -1;
+	      result = -1;
       }
     } else {
-      if((_packet_seq_no[source] < _batch_size) && 
-	 ((_max_outstanding <= 0) || 
-	  (_requestsOutstanding[source] < _max_outstanding))) {
-	
-	//coin toss to determine request type.
-	result = (RandomFloat() < 0.5) ? 2 : 1;
-      
-	_requestsOutstanding[source]++;
+      // HANS
+      if ((source % gC) < _active_nodes){
+        if((_packet_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
+        
+	        //coin toss to determine request type.
+	        result = (RandomFloat() < 0.5) ? 2 : 1;
+
+	        _requestsOutstanding[source]++;
+        }
       }
     }
   } else { //normal
-    if((_packet_seq_no[source] < _batch_size) && 
-       ((_max_outstanding <= 0) || 
-	(_requestsOutstanding[source] < _max_outstanding))) {
-      result = _GetNextPacketSize(cl);
-      _requestsOutstanding[source]++;
+    if ((source % gC) < _active_nodes){
+        if((_packet_seq_no[source] < _batch_size) && 
+           ((_max_outstanding <= 0) || 
+	    (_requestsOutstanding[source] < _max_outstanding))) {
+        result = _GetNextPacketSize(cl);
+        _requestsOutstanding[source]++;
+      }
     }
   }
-  if(result != 0) {
+  // if(result != 0) {
+  if(result > 0) {
+
     _packet_seq_no[source]++;
   }
   return result;
@@ -125,10 +134,13 @@ bool BatchTrafficManager::_SingleSim( )
       _Step();
       batch_complete = true;
       for(int i = 0; i < _nodes; ++i) {
-	if(_packet_seq_no[i] < _batch_size) {
-	  batch_complete = false;
-	  break;
-	}
+      // HANS: Additionals
+	      if((i % gC) < _active_nodes){
+          if (_packet_seq_no[i] < _batch_size) {
+	          batch_complete = false;
+	          break;
+          }
+	      }
       }
       if(_sent_packets_out) {
 	*_sent_packets_out << _packet_seq_no << endl;
@@ -213,8 +225,8 @@ void BatchTrafficManager::DisplayOverallStats(ostream & os) const {
   TrafficManager::DisplayOverallStats(os);
   os << "Overall min batch duration = " << _overall_min_batch_time / (double)_total_sims
      << " (" << _total_sims << " samples)" << endl
-     << "Overall min batch duration = " << _overall_avg_batch_time / (double)_total_sims
+     << "Overall avg batch duration = " << _overall_avg_batch_time / (double)_total_sims
      << " (" << _total_sims << " samples)" << endl
-     << "Overall min batch duration = " << _overall_max_batch_time / (double)_total_sims
+     << "Overall max batch duration = " << _overall_max_batch_time / (double)_total_sims
      << " (" << _total_sims << " samples)" << endl;
 }

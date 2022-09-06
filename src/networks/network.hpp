@@ -112,6 +112,9 @@ public:
   const vector<Router *> & GetRouters(){return _routers;}
   Router * GetRouter(int index) {return _routers[index];}
   int NumRouters() const {return _size;}
+
+  // HANS: Additionals
+  int GetChanUtil (int r, int o);
 };
 
 #endif 

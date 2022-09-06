@@ -32,6 +32,9 @@
 #include <set>
 #include "config_utils.hpp"
 
+// HANS: Additionals
+#include "globals.hpp"
+
 using namespace std;
 
 class TrafficPattern {
@@ -119,6 +122,15 @@ protected:
 class UniformRandomTrafficPattern : public RandomTrafficPattern {
 public:
   UniformRandomTrafficPattern(int nodes);
+  virtual int dest(int source);
+};
+
+// HANS: Additional
+class UniformRandomSelectiveTrafficPattern : public RandomTrafficPattern {
+private:
+  int _active_nodes;
+public:
+  UniformRandomSelectiveTrafficPattern(int nodes, int active_nodes);
   virtual int dest(int source);
 };
 

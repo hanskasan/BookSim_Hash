@@ -107,6 +107,9 @@ class IQRouter : public Router {
   vector<vector<int> > _noq_next_vc_start;
   vector<vector<int> > _noq_next_vc_end;
 
+  // HANS: Additionals
+  vector<queue<int> > _util_vect;
+
 #ifdef TRACK_FLOWS
   vector<vector<queue<int> > > _outstanding_classes;
 #endif
@@ -178,6 +181,8 @@ public:
   SwitchMonitor const * const GetSwitchMonitor() const {return _switchMonitor;}
   BufferMonitor const * const GetBufferMonitor() const {return _bufferMonitor;}
 
+  // HANS: Additionals
+  virtual int GetChanUtil(int output);
 };
 
 #endif

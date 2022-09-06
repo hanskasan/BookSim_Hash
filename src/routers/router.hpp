@@ -197,6 +197,9 @@ public:
 
   inline int NumInputs() const {return _inputs;}
   inline int NumOutputs() const {return _outputs;}
+
+  // HANS: Additonals
+  virtual int GetChanUtil(int output) { return 0; }
 };
 
 #endif

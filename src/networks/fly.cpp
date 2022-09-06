@@ -48,6 +48,7 @@ void KNFly::_ComputeSize( const Configuration &config )
   _n = config.GetInt( "n" );
 
   gK = _k; gN = _n;
+  gC = _k;
 
   _nodes = powi( _k, _n );
 
@@ -84,14 +85,18 @@ void KNFly::_BuildNet( const Configuration &config )
 	// Input connections
 	if ( stage == 0 ) {
 	  c = addr*_k + port;
+    _inject[c]->SetLatency( 1 );
+    _inject_cred[c]->SetLatency( 1 );
 	  _routers[node]->AddInputChannel( _inject[c], _inject_cred[c] );
 #ifdef DEBUG_FLY	  
 	  cout << "  injection channel " << c << endl;
 #endif 
 	} else {
+    assert(0); // HANS: Feel free to delete this if not needed
 	  c = _InChannel( stage, addr, port );
-	  _routers[node]->AddInputChannel( _chan[c], _chan_cred[c] );
 	  _chan[c]->SetLatency( 1 );
+    _chan_cred[c]->SetLatency( 1 );
+	  _routers[node]->AddInputChannel( _chan[c], _chan_cred[c] );
 
 #ifdef DEBUG_FLY
 	  cout << "  input channel " << c << endl;
@@ -101,11 +106,14 @@ void KNFly::_BuildNet( const Configuration &config )
 	// Output connections
 	if ( stage == _n - 1 ) {
 	  c = addr*_k + port;
+    _eject[c]->SetLatency( 1 );
+    _eject_cred[c]->SetLatency( 1 );
 	  _routers[node]->AddOutputChannel( _eject[c], _eject_cred[c] );
 #ifdef DEBUG_FLY
 	  cout << "  ejection channel " << c << endl;
 #endif 
 	} else {
+    assert(0);
 	  c = _OutChannel( stage, addr, port );
 	  _routers[node]->AddOutputChannel( _chan[c], _chan_cred[c] );
 #ifdef DEBUG_FLY

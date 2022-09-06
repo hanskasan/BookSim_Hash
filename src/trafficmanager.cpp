@@ -511,6 +511,12 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     _overall_crossbar_conflict_stalls.resize(_classes, 0);
 #endif
 
+    // ADDITIONALS
+    _chanutil_stats.resize(_subnets);
+    _overall_min_chanutil.resize(_subnets);
+    _overall_avg_chanutil.resize(_subnets);
+    _overall_max_chanutil.resize(_subnets);
+
     for ( int c = 0; c < _classes; ++c ) {
         ostringstream tmp_name;
 
@@ -577,6 +583,24 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
                 }
             }
         }
+
+    }
+
+    // HANS: Additionals
+    for (int s = 0; s < _subnets; s++){
+        _chanutil_stats[s].resize(_num_channels);
+        _overall_min_chanutil[s].resize(_num_channels, 0.0);
+        _overall_avg_chanutil[s].resize(_num_channels, 0.0);
+        _overall_max_chanutil[s].resize(_num_channels, 0.0);
+
+        ostringstream tmp_name;
+
+        for (int i = 0; i < _num_channels; i++){
+            tmp_name << "chanutil_stat_" << s << "_" << i;
+            _chanutil_stats[s][i] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
+            _stats[tmp_name.str()] = _chanutil_stats[s][i];
+            tmp_name.str("");
+        }
     }
 
     _slowest_flit.resize(_classes, -1);
@@ -612,6 +636,13 @@ TrafficManager::~TrafficManager( )
                     delete _pair_flat[c][i*_nodes+j];
                 }
             }
+        }
+    }
+
+    // HANS: Additionals
+    for (int s = 0; s < _subnets; s++){
+        for (int i = 0; i < _num_channels; i++) {
+            delete _chanutil_stats[s][i];
         }
     }
   
@@ -736,6 +767,18 @@ void TrafficManager::_RetireFlit( Flit *f, int dest )
                 _pair_plat[f->cl][f->src*_nodes+dest]->AddSample( f->atime - head->ctime );
                 _pair_nlat[f->cl][f->src*_nodes+dest]->AddSample( f->atime - head->itime );
             }
+
+            // cout << GetSimTime() << " - Retire packet " << f->pid << ", flit " << f->id << ", packet latency " << f->atime - head->ctime << ", network latency " << f->atime - head->itime << endl;
+
+            // HANS: Additionals
+            // Record latency distribution
+            int plat_class_idx = (f->atime - head->ctime) / _resolution;
+            if (plat_class_idx > (_num_cell - 1))   plat_class_idx = _num_cell - 1;
+            _plat_class[plat_class_idx]++;
+
+            int nlat_class_idx = (f->atime - head->itime) / _resolution;
+            if (nlat_class_idx > (_num_cell - 1))   nlat_class_idx = _num_cell - 1;
+            _nlat_class[nlat_class_idx]++;
         }
     
         if(f != head) {
@@ -882,6 +925,14 @@ void TrafficManager::_GeneratePacket( int source, int stype,
             f->head = false;
             f->dest = -1;
         }
+
+        // HANS: For debugging
+        // int pkt_watch_id = 5;
+        // if (f->pid == pkt_watch_id) f->watch = true;
+
+        // int flit_watch_id = 52628;
+        // if (f->id == flit_watch_id) f->watch = true;
+
         switch( _pri_type ) {
         case class_based:
             f->pri = _class_priority[cl];
@@ -1264,6 +1315,15 @@ void TrafficManager::_Step( )
         flits[subnet].clear();
         _net[subnet]->Evaluate( );
         _net[subnet]->WriteOutputs( );
+
+        // HANS: Additionals
+        if (GetSimTime() > 100){
+            for (int i = 0; i < 4; i++){
+                for (int j = 0; j < 4; j++){
+                    _chanutil_stats[subnet][i*4 + j]->AddSample(_net[subnet]->GetChanUtil(4+i, 4+j));
+                }
+            }
+        }
     }
 
     ++_time;
@@ -1335,7 +1395,13 @@ void TrafficManager::_ClearStats( )
             }
         }
         _hop_stats[c]->Clear();
+    }
 
+    // HANS: Additionals
+    for (int s = 0; s < _subnets; s++){
+        for (int i = 0; i < _num_channels; i++){
+            _chanutil_stats[s][i]->Clear( );
+        }
     }
 
     _reset_time = _time;
@@ -1717,7 +1783,6 @@ void TrafficManager::_UpdateOverallStats() {
         _overall_max_frag[c] += _frag_stats[c]->Max();
 
         _overall_hop_stats[c] += _hop_stats[c]->Average();
-
         int count_min, count_sum, count_max;
         double rate_min, rate_sum, rate_max;
         double rate_avg;
@@ -1778,6 +1843,16 @@ void TrafficManager::_UpdateOverallStats() {
         _overall_crossbar_conflict_stalls[c] += rate_avg;
 #endif
 
+    }
+
+    for (int s = 0; s < _subnets; s++){
+        for (int i = 0; i < 4; i++){
+            for (int j = 0; j < 4; j++){
+                _overall_min_chanutil[s][i*4 + j] += _chanutil_stats[s][i*4 + j]->Min();
+                _overall_avg_chanutil[s][i*4 + j] += _chanutil_stats[s][i*4 + j]->Average();
+                _overall_max_chanutil[s][i*4 + j] += _chanutil_stats[s][i*4 + j]->Max();
+            }
+        }
     }
 }
 
@@ -2155,6 +2230,10 @@ void TrafficManager::DisplayOverallStats( ostream & os ) const {
     
         os << "Hops average = " << _overall_hop_stats[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
+
+        // HANS: Additionals
+        PrintPlatDistribution();
+        PrintNlatDistribution();
     
 #ifdef TRACK_STALLS
         os << "Buffer busy stall rate = " << (double)_overall_buffer_busy_stalls[c] / (double)_total_sims
@@ -2170,7 +2249,15 @@ void TrafficManager::DisplayOverallStats( ostream & os ) const {
 #endif
     
     }
-  
+
+    // HANS: Additionals
+    for (int s = 0; s < _subnets; s++){
+        os << "*** CHANNEL UTILIZATION ***" << endl;
+        for (int i = 0; i < _num_channels; i++){
+            os << _overall_min_chanutil[s][i] << "\t" << _overall_avg_chanutil[s][i] << "\t" << _overall_max_chanutil[s][i] << endl;
+        }
+        os << "*** END ***" << endl << endl;
+    }
 }
 
 string TrafficManager::_OverallStatsCSV(int c) const

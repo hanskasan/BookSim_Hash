@@ -288,3 +288,10 @@ void Network::DumpNodeMap( ostream & os, string const & prefix ) const
        << _eject[s]->GetSource()->GetID() << ','
        << _inject[s]->GetSink()->GetID() << endl;
 }
+
+// HANS: Additionals
+int Network::GetChanUtil( int r, int o )
+{
+  assert((r >= 0) && (r < _size));
+  return _routers[r]->GetChanUtil(o);
+}

@@ -163,6 +163,13 @@ protected:
   vector<vector<Stats *> > _pair_nlat;
   vector<vector<Stats *> > _pair_flat;
 
+  // HANS: Additionals
+  static const int _num_channels = 16;
+  vector<vector<Stats *> >  _chanutil_stats;     
+  vector<vector<double> > _overall_min_chanutil;  
+  vector<vector<double> > _overall_avg_chanutil;  
+  vector<vector<double> > _overall_max_chanutil; 
+
   vector<Stats *> _hop_stats;
   vector<double> _overall_hop_stats;
 
@@ -259,6 +266,15 @@ protected:
   ostream * _max_credits_out;
 #endif
 
+  // HANS: Additionals
+
+  // Record latency distribution
+  static const int _resolution = 400;
+  static const int _num_cell = 66;
+
+  int _plat_class[_num_cell] = {0};
+  int _nlat_class[_num_cell] = {0};
+
   // ============ Internal methods ============ 
 protected:
 
@@ -307,6 +323,27 @@ public:
 
   inline int getTime() { return _time;}
   Stats * getStats(const string & name) { return _stats[name]; }
+
+  // HANS: Additionals
+  void PrintPlatDistribution() const{
+    cout << endl;
+    cout << "*** PACKET LATENCY DISTRIBUTION ***" << endl;
+    for (int iter_cell = 0; iter_cell < _num_cell; iter_cell++){
+      cout << iter_cell * _resolution << "\t" << _plat_class[iter_cell] << endl;
+    }
+    cout << "*** END ***" << endl;
+    cout << endl;
+  }
+
+  void PrintNlatDistribution() const{
+    cout << endl;
+    cout << "*** NETWORK LATENCY DISTRIBUTION ***" << endl;
+    for (int iter_cell = 0; iter_cell < _num_cell; iter_cell++){
+      cout << iter_cell * _resolution << "\t" << _nlat_class[iter_cell] << endl;
+    }
+    cout << "*** END ***" << endl;
+    cout << endl;
+  }
 
 };
 

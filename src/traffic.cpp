@@ -93,6 +93,9 @@ TrafficPattern * TrafficPattern::New(string const & pattern, int nodes,
     result = new RandomPermutationTrafficPattern(nodes, perm_seed);
   } else if(pattern_name == "uniform") {
     result = new UniformRandomTrafficPattern(nodes);
+  } else if(pattern_name == "uniform_sel") {
+    int active_nodes = config->GetInt("active_nodes");
+    result = new UniformRandomSelectiveTrafficPattern(nodes, active_nodes);
   } else if(pattern_name == "background") {
     vector<int> excludes = tokenize_int(params[0]);
     result = new UniformBackgroundTrafficPattern(nodes, excludes);
@@ -414,6 +417,24 @@ int UniformRandomTrafficPattern::dest(int source)
 {
   assert((source >= 0) && (source < _nodes));
   return RandomInt(_nodes - 1);
+}
+
+UniformRandomSelectiveTrafficPattern::UniformRandomSelectiveTrafficPattern(int nodes, int active_nodes)
+  : RandomTrafficPattern(nodes)
+{
+  _active_nodes = active_nodes;
+}
+
+int UniformRandomSelectiveTrafficPattern::dest(int source)
+{
+  assert((source >= 0) && (source < _nodes));
+  
+  if ((source % gC) < _active_nodes){
+    return RandomInt(gC - 1) * gC + RandomInt(_active_nodes - 1);
+  } else {
+    assert(0);
+    return source;
+  }
 }
 
 UniformBackgroundTrafficPattern::UniformBackgroundTrafficPattern(int nodes, vector<int> excluded_nodes)

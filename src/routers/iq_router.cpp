@@ -178,6 +178,9 @@ IQRouter::IQRouter( Configuration const & config, Module *parent,
   }
   _outstanding_classes.resize(_outputs, vector<queue<int> >(_vcs));
 #endif
+
+  // HANS: Additionals
+  _util_vect.resize(_outputs);
 }
 
 IQRouter::~IQRouter( )
@@ -743,6 +746,10 @@ void IQRouter::_VCAllocEvaluate( )
 			 << "  VC " << out_vc 
 			 << " at output " << out_port 
 			 << " is full." << endl;
+
+      if (f->watch)
+        cout << "HAHA: " << this->GetUsedCredit(6) << ", " << this->GetUsedCredit(7) << endl;
+
 	    reserved |= !dest_buf->IsFull();
 	  } else {
 	    cred = true;
@@ -2334,6 +2341,9 @@ void IQRouter::_SendFlits( )
 	cout << "Outport " << output << endl << "Stop Mark" << endl;
       }
       _output_channels[output]->Send( f );
+
+      // Record utilization
+      _util_vect[output].push(GetSimTime());
     }
   }
 }
@@ -2459,4 +2469,17 @@ void IQRouter::_UpdateNOQ(int input, int vc, Flit const * f) {
 		 << " (NOQ)." << endl;
     }
   }
+}
+
+// HANS: Additional
+int IQRouter::GetChanUtil(int output){
+  assert((output >= 0) && (output < _outputs));
+
+  int window = 100;
+
+  while ((!_util_vect[output].empty()) && (_util_vect[output].front() + window) <= GetSimTime()){
+    _util_vect[output].pop();
+  }
+
+  return (int)_util_vect[output].size();
 }

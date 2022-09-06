@@ -73,6 +73,9 @@ void FatTree::_ComputeSize( const Configuration& config )
   _n = config.GetInt( "n" );
    
   gK = _k; gN = _n;
+
+  // HANS: Additional
+  gC = _k;
   
   _nodes = powi( _k, _n );
 
