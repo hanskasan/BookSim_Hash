@@ -1,29 +1,4 @@
-// $Id$
-
-/*
- Copyright (c) 2007-2015, Trustees of The Leland Stanford Junior University
- All rights reserved.
-
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions are met:
-
- Redistributions of source code must retain the above copyright notice, this 
- list of conditions and the following disclaimer.
- Redistributions in binary form must reproduce the above copyright notice, this
- list of conditions and the following disclaimer in the documentation and/or
- other materials provided with the distribution.
-
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
- DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
- ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
- ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+// CSNL KAIST, Sept 2022
 
 #include <limits>
 #include <sstream>
@@ -31,9 +6,9 @@
 
 #include "packet_reply_info.hpp"
 #include "random_utils.hpp"
-#include "batchtrafficmanager.hpp"
+#include "batchratetrafficmanager.hpp"
 
-BatchTrafficManager::BatchTrafficManager( const Configuration &config, 
+BatchRateTrafficManager::BatchRateTrafficManager( const Configuration &config, 
 					  const vector<Network *> & net )
 : TrafficManager(config, net), _last_id(-1), _last_pid(-1), 
    _overall_min_batch_time(0), _overall_avg_batch_time(0), 
@@ -55,25 +30,50 @@ BatchTrafficManager::BatchTrafficManager( const Configuration &config,
     _sent_packets_out = new ofstream(sent_packets_out_file.c_str());
   }
 
-  // HANS: Additionals
+  // HANS: Get load
+  _load = config.GetFloatArray("batch_injection_rate"); 
+  if(_load.empty()) {
+      _load.push_back(config.GetFloat("batch_injection_rate"));
+  }
+  _load.resize(_classes, _load.back());
+
+  if(config.GetInt("injection_rate_uses_flits")) {
+    for(int c = 0; c < _classes; ++c)
+      _load[c] /= _GetAveragePacketSize(c);
+  }
+
+  // HANS: Get injection rate and process
+  vector<string> injection_process = config.GetStrArray("injection_process");
+  injection_process.resize(_classes, injection_process.back());
+
+  _injection_process.resize(_classes);
+  for(int c = 0; c < _classes; ++c){
+    _injection_process[c] = InjectionProcess::New(injection_process[c], _nodes, _load[c], &config);
+  }
+
+  // HANS: Active node configuration
   _active_nodes = config.GetInt("active_nodes");
   if (_active_nodes < 0)  _active_nodes = gC;
 }
 
-BatchTrafficManager::~BatchTrafficManager( )
+BatchRateTrafficManager::~BatchRateTrafficManager( )
 {
   delete _batch_time;
   if(_sent_packets_out) delete _sent_packets_out;
+
+  for (int c = 0; c < _classes; ++c) {
+    delete _injection_process[c];
+  }
 }
 
-void BatchTrafficManager::_RetireFlit( Flit *f, int dest )
+void BatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
 {
   _last_id = f->id;
   _last_pid = f->pid;
   TrafficManager::_RetireFlit(f, dest);
 }
 
-int BatchTrafficManager::_IssuePacket( int source, int cl )
+int BatchRateTrafficManager::_IssuePacket( int source, int cl )
 {
   int result = 0;
   if(_use_read_write[cl]) { //read write packets
@@ -86,7 +86,7 @@ int BatchTrafficManager::_IssuePacket( int source, int cl )
     } else {
       // HANS
       if ((source % gC) < _active_nodes){
-        if((_packet_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
+        if((_injection_process[cl]->test(source)) && (_packet_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
         
 	        //coin toss to determine request type.
 	        result = (RandomFloat() < 0.5) ? 2 : 1;
@@ -97,14 +97,9 @@ int BatchTrafficManager::_IssuePacket( int source, int cl )
     }
   } else { //normal
     if ((source % gC) < _active_nodes){
-        if((_packet_seq_no[source] < _batch_size) && 
-           ((_max_outstanding <= 0) || 
-	    (_requestsOutstanding[source] < _max_outstanding))) {
+        if((_injection_process[cl]->test(source)) && (_packet_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
         result = _GetNextPacketSize(cl);
         _requestsOutstanding[source]++;
-        
-        if (source == 0)
-          cout << GetSimTime() << " - IssuePacket" << endl;
       }
     }
   }
@@ -116,13 +111,13 @@ int BatchTrafficManager::_IssuePacket( int source, int cl )
   return result;
 }
 
-void BatchTrafficManager::_ClearStats( )
+void BatchRateTrafficManager::_ClearStats( )
 {
   TrafficManager::_ClearStats();
   _batch_time->Clear( );
 }
 
-bool BatchTrafficManager::_SingleSim( )
+bool BatchRateTrafficManager::_SingleSim( )
 {
   int batch_index = 0;
   while(batch_index < _batch_count) {
@@ -194,14 +189,14 @@ bool BatchTrafficManager::_SingleSim( )
   return 1;
 }
 
-void BatchTrafficManager::_UpdateOverallStats() {
+void BatchRateTrafficManager::_UpdateOverallStats() {
   TrafficManager::_UpdateOverallStats();
   _overall_min_batch_time += _batch_time->Min();
   _overall_avg_batch_time += _batch_time->Average();
   _overall_max_batch_time += _batch_time->Max();
 }
   
-string BatchTrafficManager::_OverallStatsCSV(int c) const
+string BatchRateTrafficManager::_OverallStatsCSV(int c) const
 {
   ostringstream os;
   os << TrafficManager::_OverallStatsCSV(c) << ','
@@ -211,20 +206,20 @@ string BatchTrafficManager::_OverallStatsCSV(int c) const
   return os.str();
 }
 
-void BatchTrafficManager::WriteStats(ostream & os) const
+void BatchRateTrafficManager::WriteStats(ostream & os) const
 {
   TrafficManager::WriteStats(os);
   os << "batch_time = " << _batch_time->Average() << ";" << endl;
 }    
 
-void BatchTrafficManager::DisplayStats(ostream & os) const {
+void BatchRateTrafficManager::DisplayStats(ostream & os) const {
   TrafficManager::DisplayStats();
   os << "Minimum batch duration = " << _batch_time->Min() << endl;
   os << "Average batch duration = " << _batch_time->Average() << endl;
   os << "Maximum batch duration = " << _batch_time->Max() << endl;
 }
 
-void BatchTrafficManager::DisplayOverallStats(ostream & os) const {
+void BatchRateTrafficManager::DisplayOverallStats(ostream & os) const {
   TrafficManager::DisplayOverallStats(os);
   os << "Overall min batch duration = " << _overall_min_batch_time / (double)_total_sims
      << " (" << _total_sims << " samples)" << endl

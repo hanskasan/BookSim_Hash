@@ -170,6 +170,10 @@ BookSimConfig::BookSimConfig( )
   
   _int_map["injection_rate_uses_flits"] = 0;
 
+  // HANS: Additionals
+  _float_map["batch_injection_rate"] = 0.1;
+  AddStrField("batch_injection_rate", ""); // workaraound to allow for vector specification
+
   // number of flits per packet
   _int_map["packet_size"] = 1;
   AddStrField("packet_size", ""); // workaraound to allow for vector specification
@@ -177,6 +181,15 @@ BookSimConfig::BookSimConfig( )
   // if multiple values are specified per class, set probabilities for each
   _int_map["packet_size_rate"] = 1;
   AddStrField("packet_size_rate", ""); // workaraound to allow for vector specification
+
+  // HANS: Additional configurations for message-based simulations
+  // number of packets per message
+  _int_map["message_size"] = 1;
+  AddStrField("message_size", ""); // workaraound to allow for vector specification
+
+  // if multiple values are specified per class, set probabilities for each
+  _int_map["message_size_rate"] = 1;
+  AddStrField("message_size_rate", ""); // workaraound to allow for vector specification
 
   AddStrField( "injection_process", "bernoulli" );
 
@@ -221,6 +234,16 @@ BookSimConfig::BookSimConfig( )
   AddStrField("read_reply_size", ""); // workaraound to allow for vector specification
   _int_map["write_reply_size"]   = 1;
   AddStrField("write_reply_size", ""); // workaraound to allow for vector specification
+
+  // HANS: Set message length in packets
+  _int_map["read_request_message_size"]  = 1;
+  AddStrField("read_request_message_size", ""); // workaraound to allow for vector specification
+  _int_map["write_request_message_size"] = 1;
+  AddStrField("write_request_message_size", ""); // workaraound to allow for vector specification
+  _int_map["read_reply_message_size"]    = 1;
+  AddStrField("read_reply_message_size", ""); // workaraound to allow for vector specification
+  _int_map["write_reply_message_size"]   = 1;
+  AddStrField("write_reply_message_size", ""); // workaraound to allow for vector specification
 
   //==== Simulation parameters ==========================
 

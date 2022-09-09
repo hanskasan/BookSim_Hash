@@ -171,8 +171,8 @@ void FatTree::_BuildNet( const Configuration& config )
 	int link = (level*chan_per_level) + pos*_k + port;
 	_Router(level, pos)->AddOutputChannel( _chan[link],
 						_chan_cred[link] );
-	_chan[link]->SetLatency( 1 );
-	_chan_cred[link]->SetLatency( 1 ); 
+	_chan[link]->SetLatency( 10 );
+	_chan_cred[link]->SetLatency( 10 ); 
 #ifdef FATTREE_DEBUG
 	cout<<_Router(level, pos)->Name()<<" "
 	    <<"down output "<<port<<" "

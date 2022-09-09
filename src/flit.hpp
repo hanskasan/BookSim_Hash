@@ -83,6 +83,11 @@ public:
   // Lookahead route info
   OutputSet la_route_set;
 
+  // HANS: Additionals for message-based simulation
+  bool msg_head;
+  bool msg_tail;
+  int mid;
+
   void Reset();
 
   static Flit * New();

@@ -200,6 +200,11 @@ public:
 
   // HANS: Additonals
   virtual int GetChanUtil(int output) { return 0; }
+
+  // HANS: For non-repeating random number
+  virtual void RandomizeHash() const {}
+  virtual int GetLastRandomizingTime() const { return -1; }
+  virtual int GetRandomNumber(int output) const { return -1; }
 };
 
 #endif

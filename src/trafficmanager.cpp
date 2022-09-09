@@ -40,6 +40,10 @@
 #include "vc.hpp"
 #include "packet_reply_info.hpp"
 
+// HANS: Additionals
+#include "batchratetrafficmanager.hpp"
+#include "msgbatchratetrafficmanager.hpp"
+
 TrafficManager * TrafficManager::New(Configuration const & config,
                                      vector<Network *> const & net)
 {
@@ -49,6 +53,11 @@ TrafficManager * TrafficManager::New(Configuration const & config,
         result = new TrafficManager(config, net);
     } else if(sim_type == "batch") {
         result = new BatchTrafficManager(config, net);
+    // HANS: Additonal batch mode
+    } else if(sim_type == "batch_rate") {
+        result = new BatchRateTrafficManager(config, net);
+    } else if(sim_type == "msg_batch_rate") {
+        result = new MsgBatchRateTrafficManager(config, net);
     } else {
         cerr << "Unknown simulation type: " << sim_type << endl;
     } 
@@ -1238,6 +1247,9 @@ void TrafficManager::_Step( )
                 }
 	
                 _last_class[n][subnet] = c;
+
+                // if (n == 0)
+                    // cout << GetSimTime() << " - Inject flit " << f->id << endl;
 
                 _partial_packets[n][c].pop_front();
 

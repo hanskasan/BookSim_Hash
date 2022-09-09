@@ -181,6 +181,14 @@ IQRouter::IQRouter( Configuration const & config, Module *parent,
 
   // HANS: Additionals
   _util_vect.resize(_outputs);
+
+  // HANS: For non-repeating random number
+  _last_randomizing_time = -1;
+  _unique_random_vect.resize(gC);
+  for (int i = 0; i < gC; i++){
+    _unique_random_vect[i] = i;
+  }
+
 }
 
 IQRouter::~IQRouter( )
@@ -2482,4 +2490,28 @@ int IQRouter::GetChanUtil(int output){
   }
 
   return (int)_util_vect[output].size();
+}
+
+// HANS: For non-repeating random number
+void IQRouter::RandomizeHash() const{
+  int n_shuffle = gC;
+
+  for (int i = 0; i < n_shuffle; i++){
+    int shuffle_with = RandomInt(n_shuffle - 1);
+
+    int temp = _unique_random_vect[i];
+    _unique_random_vect[i] = _unique_random_vect[shuffle_with];
+    _unique_random_vect[shuffle_with] = temp;
+  }
+
+  _last_randomizing_time = GetSimTime() + 10;
+}
+
+int IQRouter::GetLastRandomizingTime() const{
+  return _last_randomizing_time;
+}
+
+int IQRouter::GetRandomNumber(int output) const{
+  assert((output >= 0) && (output < (_outputs - gC)));
+  return _unique_random_vect[output];
 }

@@ -269,8 +269,8 @@ protected:
   // HANS: Additionals
 
   // Record latency distribution
-  static const int _resolution = 400;
-  static const int _num_cell = 66;
+  static const int _resolution = 20;
+  static const int _num_cell = 51;
 
   int _plat_class[_num_cell] = {0};
   int _nlat_class[_num_cell] = {0};
@@ -280,13 +280,16 @@ protected:
 
   virtual void _RetireFlit( Flit *f, int dest );
 
-  void _Inject();
+  // HANS: Change '_Inject' to virtual function
+  virtual void _Inject();
   void _Step( );
 
   bool _PacketsOutstanding( ) const;
   
   virtual int  _IssuePacket( int source, int cl );
-  void _GeneratePacket( int source, int size, int cl, int time );
+
+  // HANS: Change '_GeneratePacket' to virtual function
+  virtual void _GeneratePacket( int source, int size, int cl, int time );
 
   virtual void _ClearStats( );
 

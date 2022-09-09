@@ -80,6 +80,11 @@ void Flit::Reset()
   intm =-1;
   ph = -1;
   data = 0;
+
+  // HANS: Additionals for message-based simulation
+  mid      = -1 ;
+  msg_head = false;
+  msg_tail = false;
 }  
 
 Flit * Flit::New() {

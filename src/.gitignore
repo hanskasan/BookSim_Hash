@@ -6,4 +6,9 @@ y.tab.h
 *.d
 *.report
 group*
+rated*
+show_*
+batch_uni_run_tree
+brate_uni_run_tree
+mbrate_uni_run_tree
 usernet/
