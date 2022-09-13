@@ -44,6 +44,23 @@
 #include "outputset.hpp"
 #include "injection.hpp"
 
+// HANS: Additionals for reordering, based on Merlin's reorderLinkControl
+class Compare {
+  public:
+    bool operator() (Flit* l, Flit* r) const { return l->id > r->id; }
+};
+
+struct ReorderInfo {
+    uint send;
+    uint recv;
+    priority_queue<Flit*, vector<Flit*>, Compare> q;
+
+    ReorderInfo():
+      send(0),
+      recv(0)
+    {}
+}; 
+
 //register the requests to a node
 class PacketReplyInfo;
 
@@ -163,12 +180,18 @@ protected:
   vector<vector<Stats *> > _pair_nlat;
   vector<vector<Stats *> > _pair_flat;
 
-  // HANS: Additionals
+  // HANS: Reordering latency statistics
+  vector<Stats *> _rlat_stats;     
+  vector<double> _overall_min_rlat;  
+  vector<double> _overall_avg_rlat;  
+  vector<double> _overall_max_rlat;
+
+  // HANS: Channel utilization statistics
   static const int _num_channels = 16;
   vector<vector<Stats *> >  _chanutil_stats;     
   vector<vector<double> > _overall_min_chanutil;  
   vector<vector<double> > _overall_avg_chanutil;  
-  vector<vector<double> > _overall_max_chanutil; 
+  vector<vector<double> > _overall_max_chanutil;   
 
   vector<Stats *> _hop_stats;
   vector<double> _overall_hop_stats;
@@ -207,6 +230,9 @@ protected:
   vector<int> _slowest_flit;
 
   map<string, Stats *> _stats;
+
+  // HANS: Additionals for reordering
+  vector<vector<ReorderInfo*> > _reordering_vect;
 
   // ============ Simulation parameters ============ 
 

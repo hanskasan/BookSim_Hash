@@ -85,6 +85,11 @@ void Flit::Reset()
   mid      = -1 ;
   msg_head = false;
   msg_tail = false;
+
+  rtime    = -1 ;
+
+  // HANS: Additionals for reordering
+  packet_seq = 0;
 }  
 
 Flit * Flit::New() {

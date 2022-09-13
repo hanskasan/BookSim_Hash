@@ -88,6 +88,11 @@ public:
   bool msg_tail;
   int mid;
 
+  int rtime; // Time when entering reordering buffer
+
+  // HANS: Additionals for reordering
+  uint packet_seq;
+
   void Reset();
 
   static Flit * New();

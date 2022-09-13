@@ -147,11 +147,38 @@ MsgBatchRateTrafficManager::~MsgBatchRateTrafficManager( )
   }
 }
 
+// HANS: Inherit _RetireFlit to enable reordering buffer
 void MsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
 {
-  _last_id = f->id;
-  _last_pid = f->pid;
-  TrafficManager::_RetireFlit(f, dest);
+  // Insert to reordering buffer
+  // Push flit to its respective reordering queue
+  // if (dest == 2)
+    // cout << GetSimTime() << " - Push flit " << f->id << ", pid: " << f->pid << ", src: " << f->src << ", dest: " << f->dest << ", packet_seq: " << f->packet_seq << ", head: " << f->head << ", tail: " << f->tail << endl;
+
+  if (f->head){
+    assert(f->dest == dest);
+    f->rtime = GetSimTime();
+  }
+  _reordering_vect[f->src][dest]->q.push(f);
+
+  while ((!_reordering_vect[f->src][dest]->q.empty()) && (_reordering_vect[f->src][dest]->q.top()->packet_seq == _reordering_vect[f->src][dest]->recv)){
+    Flit* temp = _reordering_vect[f->src][dest]->q.top();
+
+    if (temp->tail){
+      _reordering_vect[f->src][dest]->recv += 1;
+    }
+
+    _last_id = temp->id;
+    _last_pid = temp->pid;
+    TrafficManager::_RetireFlit(temp, dest);
+
+    _reordering_vect[f->src][dest]->q.pop();
+  }
+
+  // HANS: Without reordering buffer
+  // _last_id = f->id;
+  // _last_pid = f->pid;
+  // TrafficManager::_RetireFlit(f, dest);
 }
 
 int MsgBatchRateTrafficManager::IssueMessage( int source, int cl )
@@ -300,11 +327,17 @@ void MsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl,
           if ( j == 0 ) { // Head flit
               f->head = true;
               //packets are only generated to nodes smaller or equal to limit
-              f->dest = message_destination;              
+              f->dest = message_destination;            
           } else {
               f->head = false;
               f->dest = -1;
           }
+
+          f->packet_seq = _reordering_vect[source][message_destination]->send;
+
+          // HANS: For debugging
+          // if (message_destination == 2)
+            // cout << GetSimTime() << " - Generate flit from " << source << " to " << message_destination << " sequence " << f->packet_seq << ", pID: " << f->pid << " ID: " << f->id << endl;
 
           // HANS: For debugging
           // int pkt_watch_id = 5;
@@ -336,6 +369,8 @@ void MsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl,
           if ( j == ( packet_size - 1 ) ) { // Tail flit
               f->tail = true;
 
+              // HANS: Additionals for packet reordering
+              _reordering_vect[source][message_destination]->send += 1;
               
           } else {
               f->tail = false;

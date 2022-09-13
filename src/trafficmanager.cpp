@@ -480,6 +480,12 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     _overall_avg_frag.resize(_classes, 0.0);
     _overall_max_frag.resize(_classes, 0.0);
 
+    // HANS: Additionals for reordering latency
+    _rlat_stats.resize(_classes);
+    _overall_min_rlat.resize(_classes, 0.0);
+    _overall_avg_rlat.resize(_classes, 0.0);
+    _overall_max_rlat.resize(_classes, 0.0);
+
     if(_pair_stats){
         _pair_plat.resize(_classes);
         _pair_nlat.resize(_classes);
@@ -554,6 +560,12 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
         _stats[tmp_name.str()] = _hop_stats[c];
         tmp_name.str("");
 
+        // HANS: Additionals for reordering latency
+        tmp_name << "rlat_stat_" << c;
+        _rlat_stats[c] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
+        _stats[tmp_name.str()] = _rlat_stats[c];
+        tmp_name.str("");
+
         if(_pair_stats){
             _pair_plat[c].resize(_nodes*_nodes);
             _pair_nlat[c].resize(_nodes*_nodes);
@@ -612,6 +624,17 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
         }
     }
 
+    // HANS: Additionals for reordering
+    _reordering_vect.resize(_nodes);
+
+    for (int i = 0; i < _nodes; i++){
+        _reordering_vect[i].resize(_nodes);
+
+        for (int j = 0; j < _nodes; j++){
+            _reordering_vect[i][j] = new ReorderInfo();
+        }
+    }
+
     _slowest_flit.resize(_classes, -1);
     _slowest_packet.resize(_classes, -1);
 
@@ -634,6 +657,9 @@ TrafficManager::~TrafficManager( )
         delete _flat_stats[c];
         delete _frag_stats[c];
         delete _hop_stats[c];
+
+        // HANS: Additionals for reordering latency
+        delete _rlat_stats[c];
 
         delete _traffic_pattern[c];
         delete _injection_process[c];
@@ -779,8 +805,7 @@ void TrafficManager::_RetireFlit( Flit *f, int dest )
 
             // cout << GetSimTime() << " - Retire packet " << f->pid << ", flit " << f->id << ", packet latency " << f->atime - head->ctime << ", network latency " << f->atime - head->itime << endl;
 
-            // HANS: Additionals
-            // Record latency distribution
+            // HANS: Additionals for recording latency distribution
             int plat_class_idx = (f->atime - head->ctime) / _resolution;
             if (plat_class_idx > (_num_cell - 1))   plat_class_idx = _num_cell - 1;
             _plat_class[plat_class_idx]++;
@@ -788,6 +813,10 @@ void TrafficManager::_RetireFlit( Flit *f, int dest )
             int nlat_class_idx = (f->atime - head->itime) / _resolution;
             if (nlat_class_idx > (_num_cell - 1))   nlat_class_idx = _num_cell - 1;
             _nlat_class[nlat_class_idx]++;
+
+            // HANS: Additionals for recording reordering latency
+            // Packet latency does not include the reordering latency
+            _rlat_stats[f->cl]->AddSample( GetSimTime() - head->rtime );
         }
     
         if(f != head) {
@@ -1385,6 +1414,9 @@ void TrafficManager::_ClearStats( )
 
         _frag_stats[c]->Clear( );
 
+        // HANS: Additionals for reordering latency
+        _rlat_stats[c]->Clear();
+
         _sent_packets[c].assign(_nodes, 0);
         _accepted_packets[c].assign(_nodes, 0);
         _sent_flits[c].assign(_nodes, 0);
@@ -1794,6 +1826,11 @@ void TrafficManager::_UpdateOverallStats() {
         _overall_avg_frag[c] += _frag_stats[c]->Average();
         _overall_max_frag[c] += _frag_stats[c]->Max();
 
+        // HANS: Additionals for reordering latency
+        _overall_min_rlat[c] += _rlat_stats[c]->Min();
+        _overall_avg_rlat[c] += _rlat_stats[c]->Average();
+        _overall_max_rlat[c] += _rlat_stats[c]->Max();
+
         _overall_hop_stats[c] += _hop_stats[c]->Average();
         int count_min, count_sum, count_max;
         double rate_min, rate_sum, rate_max;
@@ -2081,7 +2118,11 @@ void TrafficManager::DisplayStats(ostream & os) const {
             << "Slowest flit = " << _slowest_flit[c] << endl
             << "Fragmentation average = " << _frag_stats[c]->Average() << endl
             << "\tminimum = " << _frag_stats[c]->Min() << endl
-            << "\tmaximum = " << _frag_stats[c]->Max() << endl;
+            << "\tmaximum = " << _frag_stats[c]->Max() << endl
+        // HANS: Additionals for reordering latency
+            << "Reordering latency average = " << _rlat_stats[c]->Average() << endl
+            << "\tminimum = " << _rlat_stats[c]->Min() << endl
+            << "\tmaximum = " << _rlat_stats[c]->Max() << endl;
     
         int count_sum, count_min, count_max;
         double rate_sum, rate_min, rate_max;
@@ -2204,6 +2245,14 @@ void TrafficManager::DisplayOverallStats( ostream & os ) const {
         os << "\tminimum = " << _overall_min_frag[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
         os << "\tmaximum = " << _overall_max_frag[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        // HANS: Additionals for reordering latency
+        os << "Reordering latency average = " << _overall_avg_rlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_rlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_rlat[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
 
         os << "Injected packet rate average = " << _overall_avg_sent_packets[c] / (double)_total_sims
