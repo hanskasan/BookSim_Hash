@@ -37,11 +37,6 @@ MsgBatchRateTrafficManager::MsgBatchRateTrafficManager( const Configuration &con
   } 
   _load.resize(_classes, _load.back());
 
-  if(config.GetInt("injection_rate_uses_flits")) {
-    for(int c = 0; c < _classes; ++c)
-      _load[c] /= _GetAveragePacketSize(c);
-  }
-
   // HANS: Read and write message size
   _read_request_message_size = config.GetIntArray("read_request_message_size");
   if(_read_request_message_size.empty()) {
@@ -110,25 +105,25 @@ MsgBatchRateTrafficManager::MsgBatchRateTrafficManager( const Configuration &con
   for(int c = 0; c < _classes; ++c) {
       if(_use_read_write[c]) {
           _message_size[c] = 
-              vector<int>(1, (_read_request_message_size[c] + _read_reply_message_size[c] +
-                              _write_request_message_size[c] + _write_reply_message_size[c]) / 2);
+              vector<int>(1, (_read_request_message_size[c] * _read_request_size[c] + _read_reply_message_size[c] * _read_reply_size[c] +
+                              _write_request_message_size[c] * _write_request_size[c] + _write_reply_message_size[c] * _write_reply_size[c]) / 2);
           // _message_size_rate[c] = vector<int>(1, 1);
           // _message_size_max_val[c] = 0;
       }
+  }
+
+  if(config.GetInt("injection_rate_uses_flits")) {
+    for(int c = 0; c < _classes; ++c)
+      _load[c] /= GetAverageMessageSize(c);
   }
 
   // HANS: Get injection rate and process
   vector<string> injection_process = config.GetStrArray("injection_process");
   injection_process.resize(_classes, injection_process.back());
 
-  _injection_process.resize(_classes);
   for(int c = 0; c < _classes; ++c){
     _injection_process[c] = InjectionProcess::New(injection_process[c], _nodes, _load[c], &config);
   }
-
-  // HANS: Active node configuration
-  _active_nodes = config.GetInt("active_nodes");
-  if (_active_nodes < 0)  _active_nodes = gC;
 
   // HANS: Initialization
   _cur_mid = 0;
@@ -141,10 +136,6 @@ MsgBatchRateTrafficManager::~MsgBatchRateTrafficManager( )
 {
   delete _batch_time;
   if(_sent_packets_out) delete _sent_packets_out;
-
-  for (int c = 0; c < _classes; ++c) {
-    delete _injection_process[c];
-  }
 }
 
 // HANS: Inherit _RetireFlit to enable reordering buffer
@@ -152,27 +143,30 @@ void MsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
 {
   // Insert to reordering buffer
   // Push flit to its respective reordering queue
-  // if (dest == 2)
-    // cout << GetSimTime() << " - Push flit " << f->id << ", pid: " << f->pid << ", src: " << f->src << ", dest: " << f->dest << ", packet_seq: " << f->packet_seq << ", head: " << f->head << ", tail: " << f->tail << endl;
+  // if ((f->src == 15) && (dest == 13))
+  // if ((f->id == 6072) || (f->id == 6086))
+    // cout << GetSimTime() << " - Push flit " << f->id << ", pid: " << f->pid << ", src: " << f->src << ", dest: " << f->dest << ", packet_seq: " << f->packet_seq << ", head: " << f->head << ", tail: " << f->tail << " | type: " << f->type << endl;
 
   if (f->head){
     assert(f->dest == dest);
     f->rtime = GetSimTime();
   }
-  _reordering_vect[f->src][dest]->q.push(f);
 
-  while ((!_reordering_vect[f->src][dest]->q.empty()) && (_reordering_vect[f->src][dest]->q.top()->packet_seq == _reordering_vect[f->src][dest]->recv)){
-    Flit* temp = _reordering_vect[f->src][dest]->q.top();
+  int type = FindType(f->type);
+  _reordering_vect[f->src][dest][type]->q.push(f);
+
+  while ((!_reordering_vect[f->src][dest][type]->q.empty()) && (_reordering_vect[f->src][dest][type]->q.top()->packet_seq == _reordering_vect[f->src][dest][type]->recv)){
+    Flit* temp = _reordering_vect[f->src][dest][type]->q.top();
 
     if (temp->tail){
-      _reordering_vect[f->src][dest]->recv += 1;
+      _reordering_vect[f->src][dest][type]->recv += 1;
     }
 
     _last_id = temp->id;
     _last_pid = temp->pid;
     TrafficManager::_RetireFlit(temp, dest);
 
-    _reordering_vect[f->src][dest]->q.pop();
+    _reordering_vect[f->src][dest][type]->q.pop();
   }
 
   // HANS: Without reordering buffer
@@ -192,7 +186,7 @@ int MsgBatchRateTrafficManager::IssueMessage( int source, int cl )
 	      result = -1;
       }
     } else {
-      if ((source % gC) < _active_nodes){
+      if (_active_nodes.count(source) > 0){
         if((_injection_process[cl]->test(source)) && (_message_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
 	        //coin toss to determine request type.
 	        result = (RandomFloat() < 0.5) ? 2 : 1;
@@ -202,8 +196,8 @@ int MsgBatchRateTrafficManager::IssueMessage( int source, int cl )
       }
     }
   } else { //normal
-    if ((source % gC) < _active_nodes){
-        if((_injection_process[cl]->test(source)) && (_message_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
+    if (_active_nodes.count(source) > 0){
+      if((_injection_process[cl]->test(source)) && (_message_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
         result = GetNextMessageSize(cl);
         _requestsOutstanding[source]++;
       }
@@ -333,18 +327,16 @@ void MsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl,
               f->dest = -1;
           }
 
-          f->packet_seq = _reordering_vect[source][message_destination]->send;
+          int type = FindType(f->type);
+          f->packet_seq = _reordering_vect[source][message_destination][type]->send;
 
           // HANS: For debugging
           // if (message_destination == 2)
-            // cout << GetSimTime() << " - Generate flit from " << source << " to " << message_destination << " sequence " << f->packet_seq << ", pID: " << f->pid << " ID: " << f->id << endl;
+            // cout << GetSimTime() << " - Generate flit from " << source << " to " << message_destination << " sequence " << f->packet_seq << ", mID: " << f->mid << ", pID: " << f->pid << " ID: " << f->id << " | Type: " << f->type << endl;
 
           // HANS: For debugging
-          // int pkt_watch_id = 5;
-          // if (f->pid == pkt_watch_id) f->watch = true;
-
-          // int flit_watch_id = 52628;
-          // if (f->id == flit_watch_id) f->watch = true;
+          int pkt_watch_id = -1;
+          if (f->pid == pkt_watch_id) f->watch = true;
 
           switch( _pri_type ) {
           case class_based:
@@ -370,7 +362,8 @@ void MsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl,
               f->tail = true;
 
               // HANS: Additionals for packet reordering
-              _reordering_vect[source][message_destination]->send += 1;
+              int type = FindType(f->type);
+              _reordering_vect[source][message_destination][type]->send += 1;
               
           } else {
               f->tail = false;
@@ -452,7 +445,7 @@ bool MsgBatchRateTrafficManager::_SingleSim( )
       batch_complete = true;
       for(int i = 0; i < _nodes; ++i) {
       // HANS: Additionals
-	      if((i % gC) < _active_nodes){
+        if (_active_nodes.count(i) > 0){
           if (_message_seq_no[i] < _batch_size) {
 	          batch_complete = false;
 	          break;
@@ -577,5 +570,24 @@ int MsgBatchRateTrafficManager::GetNextMessageSize(int cl) const
     }
     assert(mrate.back() > pct);
     return msize.back();
+    */
+}
+
+double MsgBatchRateTrafficManager::GetAverageMessageSize(int cl) const
+{
+    vector<int> const & msize = _message_size[cl];
+    int sizes = msize.size();
+    assert(sizes == 1); // HANS: Just for now..
+    // if(sizes == 1) {
+        return (double)msize[0];
+    // }
+    
+    /*
+    vector<int> const & prate = _packet_size_rate[cl];
+    int sum = 0;
+    for(int i = 0; i < sizes; ++i) {
+        sum += psize[i] * prate[i];
+    }
+    return (double)sum / (double)(_packet_size_max_val[cl] + 1);
     */
 }

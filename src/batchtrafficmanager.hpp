@@ -47,9 +47,6 @@ protected:
   int _last_id;
   int _last_pid;
 
-  // HANS: Additionals
-  int _active_nodes;
-
   Stats * _batch_time;
   double _overall_min_batch_time;
   double _overall_avg_batch_time;

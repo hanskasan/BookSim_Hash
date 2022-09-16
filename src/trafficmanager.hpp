@@ -189,6 +189,7 @@ protected:
   // HANS: Channel utilization statistics
   static const int _num_channels = 16;
   vector<vector<Stats *> >  _chanutil_stats;     
+  vector<vector<Stats *> >  _chanutil_freq_stats;     
   vector<vector<double> > _overall_min_chanutil;  
   vector<vector<double> > _overall_avg_chanutil;  
   vector<vector<double> > _overall_max_chanutil;   
@@ -232,7 +233,8 @@ protected:
   map<string, Stats *> _stats;
 
   // HANS: Additionals for reordering
-  vector<vector<ReorderInfo*> > _reordering_vect;
+  int _flit_types = 2;
+  vector<vector<vector<ReorderInfo*> > > _reordering_vect;
 
   // ============ Simulation parameters ============ 
 
@@ -293,10 +295,11 @@ protected:
 #endif
 
   // HANS: Additionals
+  int _num_active_nodes;
 
   // Record latency distribution
-  static const int _resolution = 20;
-  static const int _num_cell = 51;
+  static const int _resolution = 50;
+  static const int _num_cell = 61;
 
   int _plat_class[_num_cell] = {0};
   int _nlat_class[_num_cell] = {0};
@@ -334,6 +337,16 @@ protected:
   int _GetNextPacketSize(int cl) const;
   double _GetAveragePacketSize(int cl) const;
 
+  // HANS: Additionals for reordering
+  virtual int FindType(Flit::FlitType type){
+    if ((type == Flit::READ_REQUEST) || (type == Flit::WRITE_REQUEST))
+      return 0;
+    else if ((type == Flit::READ_REPLY) || (type == Flit::WRITE_REPLY))
+      return 1;
+    else
+      assert(0); // Should not come here
+  }
+
 public:
 
   static TrafficManager * New(Configuration const & config, 
@@ -349,6 +362,9 @@ public:
   virtual void DisplayStats( ostream & os = cout ) const ;
   virtual void DisplayOverallStats( ostream & os = cout ) const ;
   virtual void DisplayOverallStatsCSV( ostream & os = cout ) const ;
+
+  // HANS: Additionals to show the channel utilization frequently
+  virtual void DisplayUtilizationFreq( int freq, ostream & os = cout ) const;
 
   inline int getTime() { return _time;}
   Stats * getStats(const string & name) { return _stats[name]; }

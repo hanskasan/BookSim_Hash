@@ -422,19 +422,18 @@ int UniformRandomTrafficPattern::dest(int source)
 UniformRandomSelectiveTrafficPattern::UniformRandomSelectiveTrafficPattern(int nodes, int active_nodes)
   : RandomTrafficPattern(nodes)
 {
-  _active_nodes = active_nodes;
 }
 
 int UniformRandomSelectiveTrafficPattern::dest(int source)
 {
   assert((source >= 0) && (source < _nodes));
   
-  if ((source % gC) < _active_nodes){
-    return RandomInt(gC - 1) * gC + RandomInt(_active_nodes - 1);
-  } else {
-    assert(0);
-    return source;
+  // THO: Select destination only from _active_nodes
+  int rand_dest = RandomInt(_nodes-1);
+  while(_active_nodes.count(rand_dest) != 0) {
+    rand_dest = RandomInt(_nodes-1);
   }
+  return rand_dest;
 }
 
 UniformBackgroundTrafficPattern::UniformBackgroundTrafficPattern(int nodes, vector<int> excluded_nodes)

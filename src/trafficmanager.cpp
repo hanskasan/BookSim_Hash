@@ -528,6 +528,7 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
 
     // ADDITIONALS
     _chanutil_stats.resize(_subnets);
+    _chanutil_freq_stats.resize(_subnets);
     _overall_min_chanutil.resize(_subnets);
     _overall_avg_chanutil.resize(_subnets);
     _overall_max_chanutil.resize(_subnets);
@@ -610,6 +611,7 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     // HANS: Additionals
     for (int s = 0; s < _subnets; s++){
         _chanutil_stats[s].resize(_num_channels);
+        _chanutil_freq_stats[s].resize(_num_channels);
         _overall_min_chanutil[s].resize(_num_channels, 0.0);
         _overall_avg_chanutil[s].resize(_num_channels, 0.0);
         _overall_max_chanutil[s].resize(_num_channels, 0.0);
@@ -621,6 +623,11 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
             _chanutil_stats[s][i] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
             _stats[tmp_name.str()] = _chanutil_stats[s][i];
             tmp_name.str("");
+
+            tmp_name << "chanutil_freq_stat_" << s << "_" << i;
+            _chanutil_freq_stats[s][i] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
+            _stats[tmp_name.str()] = _chanutil_freq_stats[s][i];
+            tmp_name.str("");
         }
     }
 
@@ -631,15 +638,32 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
         _reordering_vect[i].resize(_nodes);
 
         for (int j = 0; j < _nodes; j++){
-            _reordering_vect[i][j] = new ReorderInfo();
+            _reordering_vect[i][j].resize(_flit_types);
+
+            for (int k = 0; k < _flit_types; k++)
+                _reordering_vect[i][j][k] = new ReorderInfo();
         }
     }
 
     _slowest_flit.resize(_classes, -1);
     _slowest_packet.resize(_classes, -1);
 
- 
+    // HANS: Active node configuration
+    _num_active_nodes = config.GetInt("active_nodes");
+    if (_num_active_nodes < 0)  _num_active_nodes = _nodes;
 
+    // THO: Active node selection
+    int compute_node = 0;
+    while(_active_nodes.size()<(size_t)_num_active_nodes){
+        // _active_nodes.insert(RandomInt(_nodes-1));
+        _active_nodes.insert(compute_node);
+        compute_node++;
+    }
+    cout << "Compute nodes are: ";
+    for (set<int>::iterator i = _active_nodes.begin(); i != _active_nodes.end(); i++) {
+      cout << *i << " ";
+    }
+    cout << endl;
 }
 
 TrafficManager::~TrafficManager( )
@@ -678,6 +702,7 @@ TrafficManager::~TrafficManager( )
     for (int s = 0; s < _subnets; s++){
         for (int i = 0; i < _num_channels; i++) {
             delete _chanutil_stats[s][i];
+            delete _chanutil_freq_stats[s][i];
         }
     }
   
@@ -743,6 +768,19 @@ void TrafficManager::_RetireFlit( Flit *f, int dest )
     if(_pair_stats){
         _pair_flat[f->cl][f->src*_nodes+dest]->AddSample( f->atime - f->itime );
     }
+
+    // HANS: Additionals for recording reordering latency
+    // Packet latency does not include the reordering latency
+    if ( f->head ){
+        _rlat_stats[f->cl]->AddSample( GetSimTime() - f->rtime );
+
+        // if (GetSimTime() > f->rtime)
+            // cout << f->id << endl;
+
+        // if ((f->id == 6072) || (f->id == 6086))
+        // if ((f->src == 15) && (dest == 13))
+            // cout << GetSimTime() << " - Reordering latency of flit " << f->id << " is " << GetSimTime() - f->rtime << endl;
+    }
       
     if ( f->tail ) {
         Flit * head;
@@ -768,6 +806,9 @@ void TrafficManager::_RetireFlit( Flit *f, int dest )
                        << ")." << endl;
         }
 
+        // if (f->src == 12)
+            // cout << GetSimTime() << " - Retire flit " << f->id << ", dest " << f->dest << ", nlat " << f->atime - head->itime << endl;
+
         //code the source of request, look carefully, its tricky ;)
         if (f->type == Flit::READ_REQUEST || f->type == Flit::WRITE_REQUEST) {
             PacketReplyInfo* rinfo = PacketReplyInfo::New();
@@ -792,7 +833,7 @@ void TrafficManager::_RetireFlit( Flit *f, int dest )
             _hop_stats[f->cl]->AddSample( f->hops );
 
             if((_slowest_packet[f->cl] < 0) ||
-               (_plat_stats[f->cl]->Max() < (f->atime - head->itime)))
+               (_plat_stats[f->cl]->Max() < (f->atime - head->ctime)))
                 _slowest_packet[f->cl] = f->pid;
             _plat_stats[f->cl]->AddSample( f->atime - head->ctime);
             _nlat_stats[f->cl]->AddSample( f->atime - head->itime);
@@ -813,16 +854,11 @@ void TrafficManager::_RetireFlit( Flit *f, int dest )
             int nlat_class_idx = (f->atime - head->itime) / _resolution;
             if (nlat_class_idx > (_num_cell - 1))   nlat_class_idx = _num_cell - 1;
             _nlat_class[nlat_class_idx]++;
-
-            // HANS: Additionals for recording reordering latency
-            // Packet latency does not include the reordering latency
-            _rlat_stats[f->cl]->AddSample( GetSimTime() - head->rtime );
         }
     
         if(f != head) {
             head->Free();
         }
-    
     }
   
     if(f->head && !f->tail) {
@@ -964,6 +1000,9 @@ void TrafficManager::_GeneratePacket( int source, int stype,
             f->dest = -1;
         }
 
+        int type = FindType(f->type);
+        f->packet_seq = _reordering_vect[source][packet_destination][type]->send;
+
         // HANS: For debugging
         // int pkt_watch_id = 5;
         // if (f->pid == pkt_watch_id) f->watch = true;
@@ -989,6 +1028,10 @@ void TrafficManager::_GeneratePacket( int source, int stype,
         }
         if ( i == ( size - 1 ) ) { // Tail flit
             f->tail = true;
+
+            // HANS: Additionals for packet reordering
+            int type = FindType(f->type);
+            _reordering_vect[source][packet_destination][type]->send += 1;
         } else {
             f->tail = false;
         }
@@ -1362,9 +1405,13 @@ void TrafficManager::_Step( )
             for (int i = 0; i < 4; i++){
                 for (int j = 0; j < 4; j++){
                     _chanutil_stats[subnet][i*4 + j]->AddSample(_net[subnet]->GetChanUtil(4+i, 4+j));
+                    _chanutil_freq_stats[subnet][i*4 + j]->AddSample(_net[subnet]->GetChanUtil(4+i, 4+j));
                 }
             }
         }
+
+        // HANS: Additionals to frequently display the channel utilization
+        // DisplayUtilizationFreq(200);
     }
 
     ++_time;
@@ -1445,6 +1492,7 @@ void TrafficManager::_ClearStats( )
     for (int s = 0; s < _subnets; s++){
         for (int i = 0; i < _num_channels; i++){
             _chanutil_stats[s][i]->Clear( );
+            _chanutil_freq_stats[s][i]->Clear( );
         }
     }
 
@@ -1895,12 +1943,10 @@ void TrafficManager::_UpdateOverallStats() {
     }
 
     for (int s = 0; s < _subnets; s++){
-        for (int i = 0; i < 4; i++){
-            for (int j = 0; j < 4; j++){
-                _overall_min_chanutil[s][i*4 + j] += _chanutil_stats[s][i*4 + j]->Min();
-                _overall_avg_chanutil[s][i*4 + j] += _chanutil_stats[s][i*4 + j]->Average();
-                _overall_max_chanutil[s][i*4 + j] += _chanutil_stats[s][i*4 + j]->Max();
-            }
+        for (int i = 0; i < _num_channels; i++){
+            _overall_min_chanutil[s][i] += _chanutil_stats[s][i]->Min();
+            _overall_avg_chanutil[s][i] += _chanutil_stats[s][i]->Average();
+            _overall_max_chanutil[s][i] += _chanutil_stats[s][i]->Max();
         }
     }
 }
@@ -2313,7 +2359,7 @@ void TrafficManager::DisplayOverallStats( ostream & os ) const {
 
     // HANS: Additionals
     for (int s = 0; s < _subnets; s++){
-        os << "*** CHANNEL UTILIZATION ***" << endl;
+        os << "*** OVERALL UPLINK CHANNEL UTILIZATION ***" << endl;
         for (int i = 0; i < _num_channels; i++){
             os << _overall_min_chanutil[s][i] << "\t" << _overall_avg_chanutil[s][i] << "\t" << _overall_max_chanutil[s][i] << endl;
         }
@@ -2436,4 +2482,20 @@ double TrafficManager::_GetAveragePacketSize(int cl) const
         sum += psize[i] * prate[i];
     }
     return (double)sum / (double)(_packet_size_max_val[cl] + 1);
+}
+
+// HANS: Additionals to show the channel utilization frequently
+void TrafficManager::DisplayUtilizationFreq( int freq, ostream & os) const
+{
+    if ((GetSimTime() % freq) == 0){
+        for (int s = 0; s < _subnets; s++){
+            os << "*** UPLINK CHANNEL UTILIZATION AT " << GetSimTime() << " ***" << endl;
+            for (int i = 0; i < _num_channels; i++){
+                os << _chanutil_freq_stats[s][i]->Min() << "\t" << _chanutil_freq_stats[s][i]->Average() << "\t" << _chanutil_freq_stats[s][i]->Max() << endl;
+                _chanutil_freq_stats[s][i]->Clear( );
+            }
+            os << "*** END ***" << endl << endl;
+
+        }
+    }
 }

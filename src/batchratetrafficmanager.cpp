@@ -46,31 +46,45 @@ BatchRateTrafficManager::BatchRateTrafficManager( const Configuration &config,
   vector<string> injection_process = config.GetStrArray("injection_process");
   injection_process.resize(_classes, injection_process.back());
 
-  _injection_process.resize(_classes);
   for(int c = 0; c < _classes; ++c){
     _injection_process[c] = InjectionProcess::New(injection_process[c], _nodes, _load[c], &config);
   }
-
-  // HANS: Active node configuration
-  _active_nodes = config.GetInt("active_nodes");
-  if (_active_nodes < 0)  _active_nodes = gC;
 }
 
 BatchRateTrafficManager::~BatchRateTrafficManager( )
 {
   delete _batch_time;
   if(_sent_packets_out) delete _sent_packets_out;
-
-  for (int c = 0; c < _classes; ++c) {
-    delete _injection_process[c];
-  }
 }
 
 void BatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
 {
-  _last_id = f->id;
-  _last_pid = f->pid;
-  TrafficManager::_RetireFlit(f, dest);
+  if (f->head){
+    assert(f->dest == dest);
+    f->rtime = GetSimTime();
+  }
+
+  int type = FindType(f->type);
+  _reordering_vect[f->src][dest][type]->q.push(f);
+
+  while ((!_reordering_vect[f->src][dest][type]->q.empty()) && (_reordering_vect[f->src][dest][type]->q.top()->packet_seq == _reordering_vect[f->src][dest][type]->recv)){
+    Flit* temp = _reordering_vect[f->src][dest][type]->q.top();
+
+    if (temp->tail){
+      _reordering_vect[f->src][dest][type]->recv += 1;
+    }
+
+    _last_id = temp->id;
+    _last_pid = temp->pid;
+    TrafficManager::_RetireFlit(temp, dest);
+
+    _reordering_vect[f->src][dest][type]->q.pop();
+  }
+
+  // HANS: Without reordering buffer
+  // _last_id = f->id;
+  // _last_pid = f->pid;
+  // TrafficManager::_RetireFlit(f, dest);
 }
 
 int BatchRateTrafficManager::_IssuePacket( int source, int cl )
@@ -85,7 +99,7 @@ int BatchRateTrafficManager::_IssuePacket( int source, int cl )
       }
     } else {
       // HANS
-      if ((source % gC) < _active_nodes){
+      if (_active_nodes.count(source) > 0){
         if((_injection_process[cl]->test(source)) && (_packet_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
         
 	        //coin toss to determine request type.
@@ -96,8 +110,8 @@ int BatchRateTrafficManager::_IssuePacket( int source, int cl )
       }
     }
   } else { //normal
-    if ((source % gC) < _active_nodes){
-        if((_injection_process[cl]->test(source)) && (_packet_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
+    if (_active_nodes.count(source) > 0){
+      if((_injection_process[cl]->test(source)) && (_packet_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
         result = _GetNextPacketSize(cl);
         _requestsOutstanding[source]++;
       }
@@ -133,7 +147,7 @@ bool BatchRateTrafficManager::_SingleSim( )
       batch_complete = true;
       for(int i = 0; i < _nodes; ++i) {
       // HANS: Additionals
-	      if((i % gC) < _active_nodes){
+        if (_active_nodes.count(i) > 0){
           if (_packet_seq_no[i] < _batch_size) {
 	          batch_complete = false;
 	          break;

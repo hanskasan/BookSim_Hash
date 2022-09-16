@@ -33,7 +33,6 @@ protected:
   vector<int> _write_reply_message_size;
 
   // HANS: Additionals
-  int _active_nodes;
   int _cur_mid;
 
   Stats * _batch_time;
@@ -59,6 +58,7 @@ protected:
   virtual string _OverallStatsCSV(int c = 0) const;
 
   int GetNextMessageSize(int cl) const;
+  double GetAverageMessageSize(int cl) const;
 
 public:
 

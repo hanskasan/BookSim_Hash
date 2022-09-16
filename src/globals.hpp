@@ -31,6 +31,9 @@
 #include <vector>
 #include <iostream>
 
+// HANS: Additionals
+#include <set>
+
 /*all declared in main.cpp*/
 
 int GetSimTime();
@@ -49,5 +52,8 @@ extern int gNodes;
 extern bool gTrace;
 
 extern std::ostream * gWatchOut;
+
+// THO: Additonals for selecting active nodes
+extern std::set<int> _active_nodes;
 
 #endif

@@ -54,10 +54,6 @@ BatchTrafficManager::BatchTrafficManager( const Configuration &config,
   } else {
     _sent_packets_out = new ofstream(sent_packets_out_file.c_str());
   }
-
-  // HANS: Additionals
-  _active_nodes = config.GetInt("active_nodes");
-  if (_active_nodes < 0)  _active_nodes = gC;
 }
 
 BatchTrafficManager::~BatchTrafficManager( )
@@ -85,7 +81,7 @@ int BatchTrafficManager::_IssuePacket( int source, int cl )
       }
     } else {
       // HANS
-      if ((source % gC) < _active_nodes){
+      if (_active_nodes.count(source) > 0){
         if((_packet_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
         
 	        //coin toss to determine request type.
@@ -96,7 +92,7 @@ int BatchTrafficManager::_IssuePacket( int source, int cl )
       }
     }
   } else { //normal
-    if ((source % gC) < _active_nodes){
+    if (_active_nodes.count(source) > 0){
         if((_packet_seq_no[source] < _batch_size) && 
            ((_max_outstanding <= 0) || 
 	    (_requestsOutstanding[source] < _max_outstanding))) {
@@ -138,7 +134,7 @@ bool BatchTrafficManager::_SingleSim( )
       batch_complete = true;
       for(int i = 0; i < _nodes; ++i) {
       // HANS: Additionals
-	      if((i % gC) < _active_nodes){
+        if (_active_nodes.count(i) > 0){
           if (_packet_seq_no[i] < _batch_size) {
 	          batch_complete = false;
 	          break;
