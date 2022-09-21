@@ -54,7 +54,9 @@ BookSimConfig::BookSimConfig( )
   _int_map["c"] = 1; //concentration
   AddStrField( "routing_function", "none" );
 
-  _int_map["active_nodes"] = -1; // per router
+  _int_map["active_concentration"] = -1; // per router
+  _int_map["compute_nodes"] = 8; // per router
+  _int_map["memory_nodes"] = 8; // per router
 
   //simulator tries to correclty adjust latency for node/router placement 
   _int_map["use_noc_latency"] = 1;
@@ -244,6 +246,24 @@ BookSimConfig::BookSimConfig( )
   AddStrField("read_reply_message_size", ""); // workaraound to allow for vector specification
   _int_map["write_reply_message_size"]   = 1;
   AddStrField("write_reply_message_size", ""); // workaraound to allow for vector specification
+
+  _int_map["read_request_bigmessage_size"]  = 1;
+  AddStrField("read_request_bigmessage_size", ""); // workaraound to allow for vector specification
+  _int_map["write_request_bigmessage_size"] = 1;
+  AddStrField("write_request_bigmessage_size", ""); // workaraound to allow for vector specification
+  _int_map["read_reply_bigmessage_size"]    = 1;
+  AddStrField("read_reply_bigmessage_size", ""); // workaraound to allow for vector specification
+  _int_map["write_reply_bigmessage_size"]   = 1;
+  AddStrField("write_reply_bigmessage_size", ""); // workaraound to allow for vector specification
+
+    _int_map["read_request_smallmessage_size"]  = 1;
+  AddStrField("read_request_smallmessage_size", ""); // workaraound to allow for vector specification
+  _int_map["write_requestsmallgmessage_size"] = 1;
+  AddStrField("write_requestsmallgmessage_size", ""); // workaraound to allow for vector specification
+  _int_map["read_reply_bismallssage_size"]    = 1;
+  AddStrField("read_reply_bismallssage_size", ""); // workaraound to allow for vector specification
+  _int_map["write_reply_bsmallessage_size"]   = 1;
+  AddStrField("write_reply_bsmallessage_size", ""); // workaraound to allow for vector specification
 
   //==== Simulation parameters ==========================
 

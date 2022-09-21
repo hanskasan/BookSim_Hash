@@ -128,7 +128,7 @@ public:
 // HANS: Additional
 class UniformRandomSelectiveTrafficPattern : public RandomTrafficPattern {
 public:
-  UniformRandomSelectiveTrafficPattern(int nodes, int active_nodes);
+  UniformRandomSelectiveTrafficPattern(int nodes);
   virtual int dest(int source);
 };
 

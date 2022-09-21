@@ -186,7 +186,7 @@ int MsgBatchRateTrafficManager::IssueMessage( int source, int cl )
 	      result = -1;
       }
     } else {
-      if (_active_nodes.count(source) > 0){
+      if (_compute_nodes.count(source) > 0){
         if((_injection_process[cl]->test(source)) && (_message_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
 	        //coin toss to determine request type.
 	        result = (RandomFloat() < 0.5) ? 2 : 1;
@@ -196,7 +196,7 @@ int MsgBatchRateTrafficManager::IssueMessage( int source, int cl )
       }
     }
   } else { //normal
-    if (_active_nodes.count(source) > 0){
+    if (_compute_nodes.count(source) > 0){
       if((_injection_process[cl]->test(source)) && (_message_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
         result = GetNextMessageSize(cl);
         _requestsOutstanding[source]++;
@@ -382,8 +382,8 @@ void MsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl,
           }
 
           // HANS: For debugging
-          // if (source == 0)
-            // cout << GetSimTime() << " - Generate flit at source: " << f->src << ", fID: " << f->id << ", pID: " << f->pid << ", mID: " << f->mid << " | Packet_Head: " << f->head << ", Packet_Tail: " << f->tail << ", Msg_Head: " << f->msg_head << ", Msg_Tail: " << f->msg_tail << " | Type: " << f->type << endl;
+          // if (source == 12)
+            // cout << GetSimTime() << " - Generate flit at source: " << f->src << ", fID: " << f->id << ", pID: " << f->pid << ", mID: " << f->mid << " | Packet_Head: " << f->head << ", Packet_Tail: " << f->tail << ", Msg_Head: " << f->msg_head << ", Msg_Tail: " << f->msg_tail << " | Type: " << f->type << " | Prio: " << f->pri << endl;
 
           _partial_packets[source][cl].push_back( f );
       }
@@ -445,7 +445,7 @@ bool MsgBatchRateTrafficManager::_SingleSim( )
       batch_complete = true;
       for(int i = 0; i < _nodes; ++i) {
       // HANS: Additionals
-        if (_active_nodes.count(i) > 0){
+        if (_compute_nodes.count(i) > 0){
           if (_message_seq_no[i] < _batch_size) {
 	          batch_complete = false;
 	          break;

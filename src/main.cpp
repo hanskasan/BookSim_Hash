@@ -91,8 +91,8 @@ bool gTrace;
 ostream * gWatchOut;
 
 // HANS: Additionals 
-set<int> _active_nodes;
-
+set<int> _compute_nodes;
+set<int> _memory_nodes;
 
 /////////////////////////////////////////////////////////////////////////////
 

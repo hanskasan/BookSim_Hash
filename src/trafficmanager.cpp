@@ -43,6 +43,7 @@
 // HANS: Additionals
 #include "batchratetrafficmanager.hpp"
 #include "msgbatchratetrafficmanager.hpp"
+#include "mixmsgbatchratetrafficmanager.hpp"
 
 TrafficManager * TrafficManager::New(Configuration const & config,
                                      vector<Network *> const & net)
@@ -58,6 +59,8 @@ TrafficManager * TrafficManager::New(Configuration const & config,
         result = new BatchRateTrafficManager(config, net);
     } else if(sim_type == "msg_batch_rate") {
         result = new MsgBatchRateTrafficManager(config, net);
+    } else if(sim_type == "mix_msg_batch_rate") {
+        result = new MixMsgBatchRateTrafficManager(config, net);
     } else {
         cerr << "Unknown simulation type: " << sim_type << endl;
     } 
@@ -649,18 +652,45 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     _slowest_packet.resize(_classes, -1);
 
     // HANS: Active node configuration
-    _num_active_nodes = config.GetInt("active_nodes");
-    if (_num_active_nodes < 0)  _num_active_nodes = _nodes;
+    _num_active_concentration = config.GetInt("active_concentration");
+    if (_num_active_concentration <= 0)  _num_active_concentration = gC;
 
-    // THO: Active node selection
+    _num_compute_nodes = config.GetInt("compute_nodes");
+    // if (_num_compute_nodes < 0) _num_compute_nodes = _nodes;
+
+    _num_memory_nodes = config.GetInt("memory_nodes");
+    // if (_num_memory_nodes < 0) _num_compute_nodes = _nodes;
+
+    assert(_num_compute_nodes > 0);
+    assert(_num_memory_nodes > 0);
+    assert((_num_compute_nodes + _num_memory_nodes) <= _nodes);
+
+    // THO: Compute and memory node selection
     int compute_node = 0;
-    while(_active_nodes.size()<(size_t)_num_active_nodes){
+    while(_compute_nodes.size()<(size_t)_num_compute_nodes){
         // _active_nodes.insert(RandomInt(_nodes-1));
-        _active_nodes.insert(compute_node);
+        if ((compute_node % gC) < _num_active_concentration)
+            _compute_nodes.insert(compute_node);
         compute_node++;
+        assert(compute_node < _nodes);
     }
+
+    int memory_node = _nodes - 1;
+    while(_memory_nodes.size()<(size_t)_num_memory_nodes){
+        // _active_nodes.insert(RandomInt(_nodes-1));
+        if ((memory_node % gC) < _num_active_concentration)
+            _memory_nodes.insert(memory_node);
+        memory_node--;
+        assert(memory_node >= 0);
+    }
+
     cout << "Compute nodes are: ";
-    for (set<int>::iterator i = _active_nodes.begin(); i != _active_nodes.end(); i++) {
+    for (set<int>::iterator i = _compute_nodes.begin(); i != _compute_nodes.end(); i++) {
+      cout << *i << " ";
+    }
+    cout << endl;
+    cout << "Memory nodes are: ";
+    for (set<int>::iterator i = _memory_nodes.begin(); i != _memory_nodes.end(); i++) {
       cout << *i << " ";
     }
     cout << endl;
@@ -772,14 +802,9 @@ void TrafficManager::_RetireFlit( Flit *f, int dest )
     // HANS: Additionals for recording reordering latency
     // Packet latency does not include the reordering latency
     if ( f->head ){
-        _rlat_stats[f->cl]->AddSample( GetSimTime() - f->rtime );
-
-        // if (GetSimTime() > f->rtime)
-            // cout << f->id << endl;
-
-        // if ((f->id == 6072) || (f->id == 6086))
-        // if ((f->src == 15) && (dest == 13))
-            // cout << GetSimTime() << " - Reordering latency of flit " << f->id << " is " << GetSimTime() - f->rtime << endl;
+        if ((f->type == Flit::READ_REPLY) || (f->type == Flit::WRITE_REPLY)){
+            _rlat_stats[f->cl]->AddSample( GetSimTime() - f->rtime );
+        }
     }
       
     if ( f->tail ) {

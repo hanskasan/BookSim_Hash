@@ -507,7 +507,7 @@ void fattree_nca_halfhash( const Router *r, const Flit *f,
       //up ports are numbered last
       assert(in_channel<gK);//came from a up channel
 
-      if (_active_nodes.count(f->src) > 0){
+      if (_compute_nodes.count(f->src) > 0){
         // Source hashing
         // out_port = gK + (f->src % gC);
 

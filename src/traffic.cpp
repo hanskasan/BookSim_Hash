@@ -94,8 +94,7 @@ TrafficPattern * TrafficPattern::New(string const & pattern, int nodes,
   } else if(pattern_name == "uniform") {
     result = new UniformRandomTrafficPattern(nodes);
   } else if(pattern_name == "uniform_sel") {
-    int active_nodes = config->GetInt("active_nodes");
-    result = new UniformRandomSelectiveTrafficPattern(nodes, active_nodes);
+    result = new UniformRandomSelectiveTrafficPattern(nodes);
   } else if(pattern_name == "background") {
     vector<int> excludes = tokenize_int(params[0]);
     result = new UniformBackgroundTrafficPattern(nodes, excludes);
@@ -419,7 +418,7 @@ int UniformRandomTrafficPattern::dest(int source)
   return RandomInt(_nodes - 1);
 }
 
-UniformRandomSelectiveTrafficPattern::UniformRandomSelectiveTrafficPattern(int nodes, int active_nodes)
+UniformRandomSelectiveTrafficPattern::UniformRandomSelectiveTrafficPattern(int nodes)
   : RandomTrafficPattern(nodes)
 {
 }
@@ -428,12 +427,22 @@ int UniformRandomSelectiveTrafficPattern::dest(int source)
 {
   assert((source >= 0) && (source < _nodes));
   
-  // THO: Select destination only from _active_nodes
-  int rand_dest = RandomInt(_nodes-1);
-  while(_active_nodes.count(rand_dest) != 0) {
-    rand_dest = RandomInt(_nodes-1);
+  // THO: Select destination only from _memory_nodes
+  // int rand_dest = RandomInt(_nodes-1);
+  // while(_memory_nodes.count(rand_dest) == 0) {
+  //   rand_dest = RandomInt(_nodes-1);
+  // }
+
+  // return rand_dest;
+
+  // HANS: Select destination only from _memory_nodes
+  int rand = RandomInt(_memory_nodes.size() - 1);
+  set<int>::iterator temp = _memory_nodes.begin();
+  for (int iter = 0; iter < rand; iter++){
+    temp++;
   }
-  return rand_dest;
+
+  return *temp;
 }
 
 UniformBackgroundTrafficPattern::UniformBackgroundTrafficPattern(int nodes, vector<int> excluded_nodes)

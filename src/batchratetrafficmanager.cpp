@@ -99,7 +99,7 @@ int BatchRateTrafficManager::_IssuePacket( int source, int cl )
       }
     } else {
       // HANS
-      if (_active_nodes.count(source) > 0){
+      if (_compute_nodes.count(source) > 0){
         if((_injection_process[cl]->test(source)) && (_packet_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
         
 	        //coin toss to determine request type.
@@ -110,7 +110,7 @@ int BatchRateTrafficManager::_IssuePacket( int source, int cl )
       }
     }
   } else { //normal
-    if (_active_nodes.count(source) > 0){
+    if (_compute_nodes.count(source) > 0){
       if((_injection_process[cl]->test(source)) && (_packet_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
         result = _GetNextPacketSize(cl);
         _requestsOutstanding[source]++;
@@ -147,7 +147,7 @@ bool BatchRateTrafficManager::_SingleSim( )
       batch_complete = true;
       for(int i = 0; i < _nodes; ++i) {
       // HANS: Additionals
-        if (_active_nodes.count(i) > 0){
+        if (_compute_nodes.count(i) > 0){
           if (_packet_seq_no[i] < _batch_size) {
 	          batch_complete = false;
 	          break;

@@ -295,7 +295,9 @@ protected:
 #endif
 
   // HANS: Additionals
-  int _num_active_nodes;
+  int _num_active_concentration;
+  int _num_compute_nodes;
+  int _num_memory_nodes;
 
   // Record latency distribution
   static const int _resolution = 50;
