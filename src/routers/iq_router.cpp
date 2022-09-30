@@ -181,6 +181,7 @@ IQRouter::IQRouter( Configuration const & config, Module *parent,
 
   // HANS: Additionals
   _util_vect.resize(_outputs);
+  _injected_packets_vect.resize(gC, 0);
 
   // HANS: For non-repeating random number
   _last_randomizing_time = -1;
@@ -630,6 +631,11 @@ void IQRouter::_RouteUpdate( )
     }
     // NOTE: No need to handle NOQ here, as it requires lookahead routing!
     _route_vcs.pop_front();
+
+    // HANS: Additionals
+    if (input < gC){
+      _injected_packets_vect[input] += 1;
+    }
   }
 }
 
@@ -2351,6 +2357,9 @@ void IQRouter::_SendFlits( )
       _output_channels[output]->Send( f );
 
       // Record utilization
+      // if (this->GetID() == 0)
+        // cout << GetSimTime() << " - Send flit ID: " << f->id << ", type: " << f->type << ", output: " << output << ", src: " << f->src << ", dest: " << f->dest << endl;
+      
       _util_vect[output].push(GetSimTime());
     }
   }
@@ -2391,6 +2400,28 @@ int IQRouter::GetBufferOccupancy(int i) const {
   assert(i >= 0 && i < _inputs);
   return _buf[i]->GetOccupancy();
 }
+
+// HANS: Additionals
+int IQRouter::GetUsedCreditVC(int o, int v) const
+{
+  assert((o >= 0) && (o < _outputs));
+  assert((v >= 0) && (v < _vcs));
+  BufferState const * const dest_buf = _next_buf[o];
+  return dest_buf->OccupancyFor(v);
+}
+
+bool IQRouter::IsVCFull(int o, int v) const {
+  assert((o >= 0) && (o < _outputs));
+  assert((v >= 0) && (v < _vcs));
+  BufferState const * const dest_buf = _next_buf[o];
+  return (dest_buf->IsFullFor(v));
+}
+
+int IQRouter::GetInjectedPacket(int o) const {
+  assert((o >= 0) && (o < gC));
+  return _injected_packets_vect[o];
+}
+
 
 #ifdef TRACK_BUFFERS
 int IQRouter::GetUsedCreditForClass(int output, int cl) const

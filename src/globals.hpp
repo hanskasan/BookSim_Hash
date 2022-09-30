@@ -49,6 +49,9 @@ extern int gC;
 
 extern int gNodes;
 
+// HANS: Number of physical nodes, to enable simulations with fat-nodes
+extern int gPhyNodes;
+
 extern bool gTrace;
 
 extern std::ostream * gWatchOut;

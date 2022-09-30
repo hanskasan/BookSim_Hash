@@ -186,8 +186,29 @@ protected:
   vector<double> _overall_avg_rlat;  
   vector<double> _overall_max_rlat;
 
+  // HANS: Request-reply latency statistics
+  vector<Stats *> _read_plat_stats;     
+  vector<double> _overall_min_read_plat;  
+  vector<double> _overall_avg_read_plat;  
+  vector<double> _overall_max_read_plat;
+
+  vector<Stats *> _write_plat_stats;     
+  vector<double> _overall_min_write_plat;  
+  vector<double> _overall_avg_write_plat;  
+  vector<double> _overall_max_write_plat;
+
+  vector<Stats *> _read_rlat_stats;     
+  vector<double> _overall_min_read_rlat;  
+  vector<double> _overall_avg_read_rlat;  
+  vector<double> _overall_max_read_rlat;
+
+  vector<Stats *> _write_rlat_stats;     
+  vector<double> _overall_min_write_rlat;  
+  vector<double> _overall_avg_write_rlat;  
+  vector<double> _overall_max_write_rlat;
+
   // HANS: Channel utilization statistics
-  static const int _num_channels = 16;
+  static const int _num_channels = 32; // Uplink + downlink
   vector<vector<Stats *> >  _chanutil_stats;     
   vector<vector<Stats *> >  _chanutil_freq_stats;     
   vector<vector<double> > _overall_min_chanutil;  

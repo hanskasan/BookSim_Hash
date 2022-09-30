@@ -109,6 +109,7 @@ class IQRouter : public Router {
 
   // HANS: Additionals
   vector<queue<int> > _util_vect;
+  vector<int> _injected_packets_vect;
 
   // HANS: For non-repeating random number
   mutable int _last_randomizing_time;
@@ -172,6 +173,11 @@ public:
 
   virtual int GetUsedCredit(int o) const;
   virtual int GetBufferOccupancy(int i) const;
+
+  // HANS: Additionals
+  virtual int GetUsedCreditVC(int o, int v) const;
+  virtual bool IsVCFull(int o, int v) const;
+  virtual int GetInjectedPacket(int o) const;
 
 #ifdef TRACK_BUFFERS
   virtual int GetUsedCreditForClass(int output, int cl) const;

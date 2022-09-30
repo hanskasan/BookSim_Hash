@@ -6,20 +6,13 @@
 
 #include "packet_reply_info.hpp"
 #include "random_utils.hpp"
-#include "msgbatchratetrafficmanager.hpp"
+#include "mixmsgbatchratetrafficmanager.hpp"
 
-MsgBatchRateTrafficManager::MsgBatchRateTrafficManager( const Configuration &config, 
+MixMsgBatchRateTrafficManager::MixMsgBatchRateTrafficManager( const Configuration &config, 
 					  const vector<Network *> & net )
-: TrafficManager(config, net), _last_id(-1), _last_pid(-1), 
-   _overall_min_batch_time(0), _overall_avg_batch_time(0), 
-   _overall_max_batch_time(0)
+: MsgBatchRateTrafficManager(config, net)
 {
-
-  _max_outstanding = config.GetInt ("max_outstanding_requests");  
-
-  _batch_size = config.GetInt( "batch_size" );
-  _batch_count = config.GetInt( "batch_count" );
-
+  /*
   _batch_time = new Stats( this, "batch_time", 1.0, 1000 );
   _stats["batch_time"] = _batch_time;
   
@@ -29,6 +22,7 @@ MsgBatchRateTrafficManager::MsgBatchRateTrafficManager( const Configuration &con
   } else {
     _sent_packets_out = new ofstream(sent_packets_out_file.c_str());
   }
+  */
 
   // HANS: Get load
   _load = config.GetFloatArray("batch_injection_rate"); 
@@ -130,28 +124,16 @@ MsgBatchRateTrafficManager::MsgBatchRateTrafficManager( const Configuration &con
 
   // HANS: For requests and replies
   _message_seq_no.resize(_nodes);
-
-  // Print compute and memory node index
-  cout << "Compute nodes are: ";
-  for (set<int>::iterator i = _compute_nodes.begin(); i != _compute_nodes.end(); i++) {
-    cout << *i << " ";
-  }
-  cout << endl;
-  cout << "Memory nodes are: ";
-  for (set<int>::iterator i = _memory_nodes.begin(); i != _memory_nodes.end(); i++) {
-    cout << *i << " ";
-  }
-  cout << endl;
 }
 
-MsgBatchRateTrafficManager::~MsgBatchRateTrafficManager( )
+MixMsgBatchRateTrafficManager::~MixMsgBatchRateTrafficManager( )
 {
   delete _batch_time;
   if(_sent_packets_out) delete _sent_packets_out;
 }
 
 // HANS: Inherit _RetireFlit to enable reordering buffer
-void MsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
+void MixMsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
 {
   // Insert to reordering buffer
   // Push flit to its respective reordering queue
@@ -187,7 +169,7 @@ void MsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
   // TrafficManager::_RetireFlit(f, dest);
 }
 
-int MsgBatchRateTrafficManager::IssueMessage( int source, int cl )
+int MixMsgBatchRateTrafficManager::IssueMessage( int source, int cl )
 {
   int result = 0;
   if(_use_read_write[cl]) { //read write packets
@@ -201,10 +183,7 @@ int MsgBatchRateTrafficManager::IssueMessage( int source, int cl )
       if (_compute_nodes.count(source) > 0){
         if((_injection_process[cl]->test(source)) && (_message_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
 	        //coin toss to determine request type.
-	        // result = (RandomFloat() < _write_fraction[cl]) ? 2 : 1;
-
-          // HANS: Mixed read and write random
-          result = (source % 2) + 1;
+	        result = (RandomFloat() < 0.5) ? 2 : 1;
 
 	        _requestsOutstanding[source]++;
         }
@@ -225,7 +204,7 @@ int MsgBatchRateTrafficManager::IssueMessage( int source, int cl )
   return result;
 }
 
-void MsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl, int time )
+void MixMsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl, int time )
 {
     assert(stype!=0);
 
@@ -405,7 +384,7 @@ void MsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl,
     }
 }
 
-void MsgBatchRateTrafficManager::_Inject(){
+void MixMsgBatchRateTrafficManager::_Inject(){
 
     for ( int input = 0; input < _nodes; ++input ) {
         for ( int c = 0; c < _classes; ++c ) {
@@ -437,13 +416,13 @@ void MsgBatchRateTrafficManager::_Inject(){
     }
 }
 
-void MsgBatchRateTrafficManager::_ClearStats( )
+void MixMsgBatchRateTrafficManager::_ClearStats( )
 {
   TrafficManager::_ClearStats();
   _batch_time->Clear( );
 }
 
-bool MsgBatchRateTrafficManager::_SingleSim( )
+bool MixMsgBatchRateTrafficManager::_SingleSim( )
 {
   int batch_index = 0;
   while(batch_index < _batch_count) {
@@ -516,14 +495,14 @@ bool MsgBatchRateTrafficManager::_SingleSim( )
   return 1;
 }
 
-void MsgBatchRateTrafficManager::_UpdateOverallStats() {
+void MixMsgBatchRateTrafficManager::_UpdateOverallStats() {
   TrafficManager::_UpdateOverallStats();
   _overall_min_batch_time += _batch_time->Min();
   _overall_avg_batch_time += _batch_time->Average();
   _overall_max_batch_time += _batch_time->Max();
 }
   
-string MsgBatchRateTrafficManager::_OverallStatsCSV(int c) const
+string MixMsgBatchRateTrafficManager::_OverallStatsCSV(int c) const
 {
   ostringstream os;
   os << TrafficManager::_OverallStatsCSV(c) << ','
@@ -533,20 +512,20 @@ string MsgBatchRateTrafficManager::_OverallStatsCSV(int c) const
   return os.str();
 }
 
-void MsgBatchRateTrafficManager::WriteStats(ostream & os) const
+void MixMsgBatchRateTrafficManager::WriteStats(ostream & os) const
 {
   TrafficManager::WriteStats(os);
   os << "batch_time = " << _batch_time->Average() << ";" << endl;
 }    
 
-void MsgBatchRateTrafficManager::DisplayStats(ostream & os) const {
+void MixMsgBatchRateTrafficManager::DisplayStats(ostream & os) const {
   TrafficManager::DisplayStats();
   os << "Minimum batch duration = " << _batch_time->Min() << endl;
   os << "Average batch duration = " << _batch_time->Average() << endl;
   os << "Maximum batch duration = " << _batch_time->Max() << endl;
 }
 
-void MsgBatchRateTrafficManager::DisplayOverallStats(ostream & os) const {
+void MixMsgBatchRateTrafficManager::DisplayOverallStats(ostream & os) const {
   TrafficManager::DisplayOverallStats(os);
   os << "Overall min batch duration = " << _overall_min_batch_time / (double)_total_sims
      << " (" << _total_sims << " samples)" << endl
@@ -556,7 +535,7 @@ void MsgBatchRateTrafficManager::DisplayOverallStats(ostream & os) const {
      << " (" << _total_sims << " samples)" << endl;
 }
 
-int MsgBatchRateTrafficManager::GetNextMessageSize(int cl) const
+int MixMsgBatchRateTrafficManager::GetNextMessageSize(int cl) const
 {
   assert(cl >= 0 && cl < _classes);
 
@@ -588,7 +567,7 @@ int MsgBatchRateTrafficManager::GetNextMessageSize(int cl) const
     */
 }
 
-double MsgBatchRateTrafficManager::GetAverageMessageSize(int cl) const
+double MixMsgBatchRateTrafficManager::GetAverageMessageSize(int cl) const
 {
     vector<int> const & msize = _message_size[cl];
     int sizes = msize.size();

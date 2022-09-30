@@ -124,6 +124,11 @@ public:
   virtual int GetUsedCredit(int o) const = 0;
   virtual int GetBufferOccupancy(int i) const = 0;
 
+  // HANS: Additionals
+  virtual int GetUsedCreditVC(int o, int v) const = 0;
+  virtual bool IsVCFull(int o, int v) const = 0;
+  virtual int GetInjectedPacket(int o) const = 0;
+
 #ifdef TRACK_BUFFERS
   virtual int GetUsedCreditForClass(int output, int cl) const = 0;
   virtual int GetBufferOccupancyForClass(int input, int cl) const = 0;

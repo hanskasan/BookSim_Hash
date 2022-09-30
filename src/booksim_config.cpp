@@ -193,6 +193,9 @@ BookSimConfig::BookSimConfig( )
   _int_map["message_size_rate"] = 1;
   AddStrField("message_size_rate", ""); // workaraound to allow for vector specification
 
+  // HANS: Additional configurations for simulations using fat-node
+  _int_map["is_fat_node"] = 0;
+
   AddStrField( "injection_process", "bernoulli" );
 
   _float_map["burst_alpha"] = 0.5; // burst interval

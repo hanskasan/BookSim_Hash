@@ -81,9 +81,12 @@ bool gPrintActivity;
 
 int gK;//radix
 int gN;//dimension
-int gC;//concentration
+int gC;//concentratioN
 
 int gNodes;
+
+// HANS: Number of physical nodes, to enable simulations with fat-nodes
+int gPhyNodes;
 
 //generate nocviewer trace
 bool gTrace;

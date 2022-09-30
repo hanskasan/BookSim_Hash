@@ -76,6 +76,7 @@ void FatTree::_ComputeSize( const Configuration& config )
 
   // HANS: Additional
   gC = _k;
+  gPhyNodes = _k;
   
   _nodes = powi( _k, _n );
 
