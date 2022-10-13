@@ -18,7 +18,7 @@ protected:
   int _physical_nodes;
 
   int IssueMessage( int physical_source, int cl );
-  void GenerateMessage( int physical_source, int size, int cl, int time );
+  void GenerateMessage( int source, int size, int cl, int time );
 
   virtual void _Inject( );
   virtual void _RetireFlit( Flit *f, int dest );

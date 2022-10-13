@@ -367,7 +367,7 @@ protected:
     else if ((type == Flit::READ_REPLY) || (type == Flit::WRITE_REPLY))
       return 1;
     else
-      assert(0); // Should not come here
+      return 0;
   }
 
 public:

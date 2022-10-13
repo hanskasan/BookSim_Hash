@@ -209,7 +209,9 @@ public:
   // HANS: For non-repeating random number
   virtual void RandomizeHash() const {}
   virtual int GetLastRandomizingTime() const { return -1; }
-  virtual int GetRandomNumber(int output) const { return -1; }
+  virtual int GetRandomNumber(int src) const { return -1; }
+  virtual int GetRandomNumberFromSet(int src) const { return -1; }
+
 };
 
 #endif

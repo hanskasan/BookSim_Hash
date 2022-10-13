@@ -159,15 +159,16 @@ void MsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
   // if ((f->id == 6072) || (f->id == 6086))
     // cout << GetSimTime() << " - Push flit " << f->id << ", pid: " << f->pid << ", src: " << f->src << ", dest: " << f->dest << ", packet_seq: " << f->packet_seq << ", head: " << f->head << ", tail: " << f->tail << " | type: " << f->type << endl;
 
-  if (f->head){
-    assert(f->dest == dest);
+  // if (f->head){
+  if (f->tail){
+    // assert(f->dest == dest);
     f->rtime = GetSimTime();
   }
 
   int type = FindType(f->type);
   _reordering_vect[f->src][dest][type]->q.push(f);
 
-  while ((!_reordering_vect[f->src][dest][type]->q.empty()) && (_reordering_vect[f->src][dest][type]->q.top()->packet_seq == _reordering_vect[f->src][dest][type]->recv)){
+  while ((!_reordering_vect[f->src][dest][type]->q.empty()) && (_reordering_vect[f->src][dest][type]->q.top()->packet_seq <= _reordering_vect[f->src][dest][type]->recv)){
     Flit* temp = _reordering_vect[f->src][dest][type]->q.top();
 
     if (temp->tail){

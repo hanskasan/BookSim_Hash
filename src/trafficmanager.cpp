@@ -746,8 +746,11 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
 
     // HANS: Manual compute and memory node selection
     // 1. Clustered
-    vector<int> temp_comp = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
-    vector<int> temp_mem  = {12, 13, 14, 15};
+    // vector<int> temp_comp = {0, 1, 2, 3, 4, 5, 6, 7};
+    // vector<int> temp_mem  = {8, 9, 10, 11, 12, 13, 14, 15};
+
+    vector<int> temp_comp = {0, 1, 2, 3};
+    vector<int> temp_mem  = {4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 
     // 2. Interleaved
     // vector<int> temp_comp = {0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14};
@@ -869,17 +872,22 @@ void TrafficManager::_RetireFlit( Flit *f, int dest )
 
     // HANS: Additionals for recording reordering latency
     // Packet latency does not include the reordering latency
-    if ( f->head ){
-        if ((f->type == Flit::READ_REPLY) || (f->type == Flit::WRITE_REPLY)){ // Only record reply traffic 
+    // if ( f->head ){
+    if ( f->tail ){
+        if (_use_read_write[f->cl]){
+            if ((f->type == Flit::READ_REPLY) || (f->type == Flit::WRITE_REPLY)){ // Only record reply traffic 
+                _rlat_stats[f->cl]->AddSample( GetSimTime() - f->rtime );
+            }
+
+            if (f->type == Flit::READ_REPLY){
+                _read_rlat_stats[f->cl]->AddSample( GetSimTime() - f->rtime );
+            }
+
+            if (f->type == Flit::WRITE_REPLY){
+                _write_rlat_stats[f->cl]->AddSample( GetSimTime() - f->rtime );
+            }
+        } else {
             _rlat_stats[f->cl]->AddSample( GetSimTime() - f->rtime );
-        }
-
-        if (f->type == Flit::READ_REPLY){
-            _read_rlat_stats[f->cl]->AddSample( GetSimTime() - f->rtime );
-        }
-
-        if (f->type == Flit::WRITE_REPLY){
-            _write_rlat_stats[f->cl]->AddSample( GetSimTime() - f->rtime );
         }
     }
       
@@ -959,8 +967,7 @@ void TrafficManager::_RetireFlit( Flit *f, int dest )
             // HANS: Additionals for request-reply traffic
             if ((f->type == Flit::READ_REQUEST) || (f->type == Flit::READ_REPLY)){
                 _read_plat_stats[f->cl]->AddSample( f->atime - head->ctime);
-            } else {
-                assert((f->type == Flit::WRITE_REQUEST) || (f->type == Flit::WRITE_REPLY));
+            } else if ((f->type == Flit::WRITE_REQUEST) || (f->type == Flit::WRITE_REPLY)) {
                 _write_plat_stats[f->cl]->AddSample( f->atime - head->ctime);
             }
 

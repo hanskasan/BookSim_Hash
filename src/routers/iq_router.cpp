@@ -190,6 +190,23 @@ IQRouter::IQRouter( Configuration const & config, Module *parent,
     _unique_random_vect[i] = i;
   }
 
+  unsigned long num_random = 3;
+  _unique_random_set_vect.resize(gC);
+  for (int i = 0; i < gC; i++){
+    set<int> temp;
+    temp.clear();
+
+    // cout << "Inserted: ";
+    while(temp.size() < num_random){
+      int rndm = RandomInt(gC - 1);
+      temp.insert(rndm);
+      // cout << rndm << ", ";
+    }
+    // cout << endl;
+
+    _unique_random_set_vect[i] = temp;
+  }
+
 }
 
 IQRouter::~IQRouter( )
@@ -2542,7 +2559,20 @@ int IQRouter::GetLastRandomizingTime() const{
   return _last_randomizing_time;
 }
 
-int IQRouter::GetRandomNumber(int output) const{
-  assert((output >= 0) && (output < (_outputs - gC)));
-  return _unique_random_vect[output];
+int IQRouter::GetRandomNumber(int src) const{
+  assert((src >= 0) && (src < (_outputs - gC)));
+  return _unique_random_vect[src];
+}
+
+int IQRouter::GetRandomNumberFromSet(int src) const{
+  assert((src >= 0) && (src < (_outputs - gC)));
+
+  set<int> temp = _unique_random_set_vect[src];
+  int rndm = RandomInt(gC - 1);
+
+  while (temp.count(rndm) == 0){
+    rndm = RandomInt(gC - 1);
+  }
+
+  return rndm;
 }

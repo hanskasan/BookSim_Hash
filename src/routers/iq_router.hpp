@@ -114,6 +114,8 @@ class IQRouter : public Router {
   // HANS: For non-repeating random number
   mutable int _last_randomizing_time;
   mutable vector<int> _unique_random_vect;
+  mutable vector<set<int> > _unique_random_set_vect;
+
 
 #ifdef TRACK_FLOWS
   vector<vector<queue<int> > > _outstanding_classes;
@@ -197,7 +199,8 @@ public:
   // HANS: For non-repeating random number
   virtual void RandomizeHash() const;
   virtual int GetLastRandomizingTime() const;
-  virtual int GetRandomNumber(int output) const;
+  virtual int GetRandomNumber(int src) const;
+  virtual int GetRandomNumberFromSet(int src) const;
 };
 
 #endif

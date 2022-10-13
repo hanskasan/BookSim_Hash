@@ -130,8 +130,9 @@ int FatMsgBatchRateTrafficManager::IssueMessage( int physical_source, int cl )
   return result;
 }
 
-void FatMsgBatchRateTrafficManager::GenerateMessage( int physical_source, int stype, int cl, int time )
+void FatMsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl, int time )
 {
+    int physical_source = source / gC;
     assert((physical_source >= 0) && (physical_source < _physical_nodes));
     assert(stype!=0);
 
@@ -205,7 +206,7 @@ void FatMsgBatchRateTrafficManager::GenerateMessage( int physical_source, int st
       assert(_cur_pid);
 
       // Distribute packets across the fat node's input port
-      int temp_source = physical_source * gC + RandomInt(gC - 1);
+      int temp_source = physical_source * gC + ((source + i) % gC);
 
       if ( watch ) { 
         *gWatchOut << GetSimTime() << " | "
@@ -215,8 +216,6 @@ void FatMsgBatchRateTrafficManager::GenerateMessage( int physical_source, int st
                    << " at time " << time
                    << "." << endl;
       }
-
-      
 
       for ( int j = 0; j < packet_size; ++j ) {
           Flit * f  = Flit::New();
@@ -257,13 +256,21 @@ void FatMsgBatchRateTrafficManager::GenerateMessage( int physical_source, int st
 
           // HANS: For debugging
         //   if (f->id == 354){
-        //   if (f->pid == 100){
+        //   if (f->pid == 54){
         //   if (f->mid == 4){
             // f->watch = true;
         //   }
 
           int type = FindType(f->type);
           f->packet_seq = _reordering_vect[physical_source][message_destination][type]->send;
+
+        //   if ((f->msg_head) && (f->head)){
+            // if ((physical_source == 3) && (message_destination == 2))
+                // cout << GetSimTime() << " - Send message " << f->mid << " packet " << f->pid << " with sequence " << f->packet_seq << endl;
+        //   }
+
+          if (f->watch)
+            cout << GetSimTime() << " - Assign message " << f->mid << " packet " << f->pid << " with sequence " << f->packet_seq << endl;
 
           switch( _pri_type ) {
           case class_based:
@@ -320,10 +327,14 @@ void FatMsgBatchRateTrafficManager::_Inject(){
             // Potentially generate packets for any (phy,class)
             // that is currently empty
 
-            bool is_empty = true;
+            int empty_port;
+            bool is_empty = false;
             for ( int n = 0; n < gC; ++n ){
-                if (!_partial_packets[phy * gC + n][c].empty())
-                    is_empty = false;
+                if (_partial_packets[phy * gC + n][c].empty()){
+                    empty_port = phy * gC + n;
+                    is_empty = true;
+                    break;
+                }
             }
 
             if ( is_empty ) {
@@ -332,7 +343,7 @@ void FatMsgBatchRateTrafficManager::_Inject(){
                     int stype = IssueMessage( phy, c );
 	  
                     if ( stype != 0 ) { //generate a packet
-                        GenerateMessage( phy, stype, c, 
+                        GenerateMessage( empty_port, stype, c, 
                                          _include_queuing==1 ? 
                                          _qtime[phy][c] : _time );
                         generated = true;
@@ -364,12 +375,22 @@ void FatMsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
   }
 
   int type = FindType(f->type);
+
+//   if ((f->msg_head) && (f->head)){
+    // if ((physical_source == 3) && (physical_dest == 2))
+        // cout << GetSimTime() << " - Push message " << f->mid << " with sequence " << f->packet_seq << " to reordering buffer" << endl;
+//   }
+
+
   _reordering_vect[physical_source][physical_dest][type]->q.push(f);
 
   while ((!_reordering_vect[physical_source][physical_dest][type]->q.empty()) && (_reordering_vect[physical_source][physical_dest][type]->q.top()->packet_seq == _reordering_vect[physical_source][physical_dest][type]->recv)){
     Flit* temp = _reordering_vect[physical_source][physical_dest][type]->q.top();
 
     if (temp->tail){
+        // if ((physical_source == 3) && (physical_dest == 2))
+        //   cout << GetSimTime() << " - Pop message " << temp->mid << " packet " << temp->pid << " flit " << temp->id << " with sequence " << temp->packet_seq << " from reordering buffer." << endl;
+
       _reordering_vect[physical_source][physical_dest][type]->recv += 1;
     }
 
@@ -384,6 +405,7 @@ void FatMsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
 
 void FatMsgBatchRateTrafficManager::OriRetireFlit( Flit *f, int dest )
 {
+    int physical_source = f->src / gC;
     int physical_dest = dest / gC;
 
     _deadlock_timer = 0;
