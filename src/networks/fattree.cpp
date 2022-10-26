@@ -164,6 +164,9 @@ void FatTree::_BuildNet( const Configuration& config )
   int chan_per_direction = (_k * powi( _k , _n-1 )); //up or down
   int chan_per_level = 2*(_k * powi( _k , _n-1 )); //up+down
 
+  // HANS: Channel latency setting from the configuration file
+  int chan_latency = config.GetInt("chan_latency");
+
   //connect all down output channels
   //level n-1's down channel are injection channels
   for (level = 0; level<_n-1; level++){
@@ -172,8 +175,8 @@ void FatTree::_BuildNet( const Configuration& config )
 	int link = (level*chan_per_level) + pos*_k + port;
 	_Router(level, pos)->AddOutputChannel( _chan[link],
 						_chan_cred[link] );
-	_chan[link]->SetLatency( 10 );
-	_chan_cred[link]->SetLatency( 10 ); 
+	_chan[link]->SetLatency( chan_latency );
+	_chan_cred[link]->SetLatency( chan_latency ); 
 #ifdef FATTREE_DEBUG
 	cout<<_Router(level, pos)->Name()<<" "
 	    <<"down output "<<port<<" "
@@ -191,8 +194,8 @@ void FatTree::_BuildNet( const Configuration& config )
 	int link = (level*chan_per_level - chan_per_direction) + pos*_k + port ;
 	_Router(level, pos)->AddOutputChannel( _chan[link],
 						_chan_cred[link] );
-	_chan[link]->SetLatency( 10 );
-	_chan_cred[link]->SetLatency( 10 ); 
+	_chan[link]->SetLatency( chan_latency );
+	_chan_cred[link]->SetLatency( chan_latency ); 
 #ifdef FATTREE_DEBUG
 	cout<<_Router(level, pos)->Name()<<" "
 	    <<"up output "<<port<<" "

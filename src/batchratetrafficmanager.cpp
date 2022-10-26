@@ -59,8 +59,10 @@ BatchRateTrafficManager::~BatchRateTrafficManager( )
 
 void BatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
 {
-  if (f->head){
-    assert(f->dest == dest);
+#ifdef PACKET_GRAN_ORDER
+  // if (f->head){
+  if (f->tail){
+    // assert(f->dest == dest);
     f->rtime = GetSimTime();
   }
 
@@ -81,10 +83,12 @@ void BatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
     _reordering_vect[f->src][dest][type]->q.pop();
   }
 
+#else
   // HANS: Without reordering buffer
-  // _last_id = f->id;
-  // _last_pid = f->pid;
-  // TrafficManager::_RetireFlit(f, dest);
+  _last_id = f->id;
+  _last_pid = f->pid;
+  TrafficManager::_RetireFlit(f, dest);
+#endif
 }
 
 int BatchRateTrafficManager::_IssuePacket( int source, int cl )

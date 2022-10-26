@@ -61,6 +61,8 @@ BookSimConfig::BookSimConfig( )
   //simulator tries to correclty adjust latency for node/router placement 
   _int_map["use_noc_latency"] = 1;
 
+  // HANS: Additional configuration
+  _int_map["chan_latency"] = 1;
 
   //used for noc latency calcualtion for network with concentration
   _int_map["x"] = 8; //number of routers in X

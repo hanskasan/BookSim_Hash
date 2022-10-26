@@ -44,6 +44,11 @@
 #include "outputset.hpp"
 #include "injection.hpp"
 
+// HANS: Reordering options
+// #define PACKET_GRAN_ORDER // Packet granularity reordering
+#define MESSAGE_GRAN_ORDER // Message granularity ordering
+// #define ORDER_AS_GAP
+
 // HANS: Additionals for reordering, based on Merlin's reorderLinkControl
 class Compare {
   public:
@@ -51,15 +56,21 @@ class Compare {
 };
 
 struct ReorderInfo {
-    uint send;
-    uint recv;
-    priority_queue<Flit*, vector<Flit*>, Compare> q;
+#ifdef PACKET_GRAN_ORDER
+  uint send;
+  uint recv;
+  priority_queue<Flit*, vector<Flit*>, Compare > q;
+#else
+  map<int, pair<int, priority_queue<Flit*, vector<Flit*>, Compare > > > q;
+#endif
 
-    ReorderInfo():
-      send(0),
-      recv(0)
-    {}
-}; 
+  ReorderInfo()
+#ifdef PACKET_GRAN_ORDER
+  : send(0),
+    recv(0)
+#endif
+  {}
+};
 
 //register the requests to a node
 class PacketReplyInfo;
@@ -324,8 +335,12 @@ protected:
   static const int _resolution = 50;
   static const int _num_cell = 61;
 
+  static const int _resolution_rlat = 5; // 5
+  static const int _num_cell_rlat = 120; // 50
+
   int _plat_class[_num_cell] = {0};
   int _nlat_class[_num_cell] = {0};
+  int _rlat_class[_num_cell_rlat] = {0};
 
   // ============ Internal methods ============ 
 protected:
@@ -408,6 +423,16 @@ public:
     cout << "*** NETWORK LATENCY DISTRIBUTION ***" << endl;
     for (int iter_cell = 0; iter_cell < _num_cell; iter_cell++){
       cout << iter_cell * _resolution << "\t" << _nlat_class[iter_cell] << endl;
+    }
+    cout << "*** END ***" << endl;
+    cout << endl;
+  }
+
+  void PrintRlatDistribution() const{
+    cout << endl;
+    cout << "*** REORDERING LATENCY DISTRIBUTION ***" << endl;
+    for (int iter_cell = 0; iter_cell < _num_cell_rlat; iter_cell++){
+      cout << iter_cell * _resolution_rlat << "\t" << _rlat_class[iter_cell] << endl;
     }
     cout << "*** END ***" << endl;
     cout << endl;

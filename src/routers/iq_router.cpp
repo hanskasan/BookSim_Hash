@@ -2376,6 +2376,10 @@ void IQRouter::_SendFlits( )
       // Record utilization
       // if (this->GetID() == 0)
         // cout << GetSimTime() << " - Send flit ID: " << f->id << ", type: " << f->type << ", output: " << output << ", src: " << f->src << ", dest: " << f->dest << endl;
+
+      // HANS: For debugging
+      if (f->hops == 1)
+        f->out_port = output;
       
       _util_vect[output].push(GetSimTime());
     }

@@ -93,6 +93,8 @@ public:
   // HANS: Additionals for reordering
   uint packet_seq;
 
+  mutable int out_port;
+
   void Reset();
 
   static Flit * New();

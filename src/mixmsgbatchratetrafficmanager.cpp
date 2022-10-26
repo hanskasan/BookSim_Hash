@@ -141,26 +141,53 @@ void MixMsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
   // if ((f->id == 6072) || (f->id == 6086))
     // cout << GetSimTime() << " - Push flit " << f->id << ", pid: " << f->pid << ", src: " << f->src << ", dest: " << f->dest << ", packet_seq: " << f->packet_seq << ", head: " << f->head << ", tail: " << f->tail << " | type: " << f->type << endl;
 
-  if (f->head){
-    assert(f->dest == dest);
+  // if (f->head){
+  if (f->tail){
+    // assert(f->dest == dest);
     f->rtime = GetSimTime();
   }
 
   int type = FindType(f->type);
+#ifdef PACKET_GRAN_ORDER
   _reordering_vect[f->src][dest][type]->q.push(f);
+#else
+  auto search = _reordering_vect[f->src][dest][type]->q.find(f->mid);
 
+  if (search != _reordering_vect[f->src][dest][type]->q.end()){ // Entry already exists
+    search->second.second.push(f);
+  } else { // Create new entry in the map
+    priority_queue<Flit*, vector<Flit*>, Compare > temp;
+
+    auto temp_pair = make_pair(f->mid, make_pair(0, temp));
+
+    assert(_reordering_vect[f->src][dest][type]->q.insert(temp_pair).second);
+    search = _reordering_vect[f->src][dest][type]->q.find(f->mid);
+  }
+#endif
+
+#ifdef PACKET_GRAN_ORDER
   while ((!_reordering_vect[f->src][dest][type]->q.empty()) && (_reordering_vect[f->src][dest][type]->q.top()->packet_seq == _reordering_vect[f->src][dest][type]->recv)){
     Flit* temp = _reordering_vect[f->src][dest][type]->q.top();
 
-    if (temp->tail){
+    if (temp->tail)
       _reordering_vect[f->src][dest][type]->recv += 1;
-    }
+#else
+  while (search->second.second.top()->packet_seq <= (unsigned)search->second.first){
+    Flit* temp = search->second.second.top();
+
+    if (temp->tail)
+      search->second.first += 1;
+#endif
 
     _last_id = temp->id;
     _last_pid = temp->pid;
     TrafficManager::_RetireFlit(temp, dest);
 
+#ifdef PACKET_GRAN_ORDER
     _reordering_vect[f->src][dest][type]->q.pop();
+#else
+    search->second.second.pop();
+#endif
   }
 
   // HANS: Without reordering buffer
@@ -321,8 +348,12 @@ void MixMsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int 
               f->dest = -1;
           }
 
+#ifdef PACKET_GRAN_ORDER
           int type = FindType(f->type);
           f->packet_seq = _reordering_vect[source][message_destination][type]->send;
+#else
+          f->packet_seq = i;
+#endif
 
           // HANS: For debugging
           // if (message_destination == 2)
@@ -356,8 +387,10 @@ void MixMsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int 
               f->tail = true;
 
               // HANS: Additionals for packet reordering
+#ifdef PACKET_GRAN_ORDER
               int type = FindType(f->type);
               _reordering_vect[source][message_destination][type]->send += 1;
+#endif
               
           } else {
               f->tail = false;

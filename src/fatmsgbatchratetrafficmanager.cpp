@@ -53,12 +53,12 @@ FatMsgBatchRateTrafficManager::FatMsgBatchRateTrafficManager( const Configuratio
   _compute_nodes = temp_set_comp;
   _memory_nodes  = temp_set_mem;
 
-  cout << "Compute nodes are: ";
+  cout << "Fat compute nodes are: ";
   for (set<int>::iterator i = _compute_nodes.begin(); i != _compute_nodes.end(); i++) {
     cout << *i << " ";
   }
   cout << endl;
-  cout << "Memory nodes are: ";
+  cout << "Fat memory nodes are: ";
   for (set<int>::iterator i = _memory_nodes.begin(); i != _memory_nodes.end(); i++) {
     cout << *i << " ";
   }
@@ -247,22 +247,27 @@ void FatMsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int 
           if ( j == 0 ) { // Head flit
               f->head = true;
               //packets are only generated to nodes smaller or equal to limit
-            //   f->dest = message_destination * gC + (f->src % gC);            
-              f->dest = message_destination * gC + RandomInt(gC - 1);            
+              f->dest = message_destination * gC + (f->src % gC);            
+            //   f->dest = message_destination * gC + RandomInt(gC - 1);            
           } else {
               f->head = false;
-              f->dest = -1;
+            //   f->dest = -1;
+              f->dest = message_destination * gC + (f->src % gC); // HANS: Just for debugging
           }
 
           // HANS: For debugging
-        //   if (f->id == 354){
+        //   if (f->id == 0){
         //   if (f->pid == 54){
         //   if (f->mid == 4){
             // f->watch = true;
         //   }
 
           int type = FindType(f->type);
+#ifdef PACKET_GRAN_ORDER
           f->packet_seq = _reordering_vect[physical_source][message_destination][type]->send;
+#else
+          f->packet_seq = i;
+#endif
 
         //   if ((f->msg_head) && (f->head)){
             // if ((physical_source == 3) && (message_destination == 2))
@@ -296,8 +301,10 @@ void FatMsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int 
               f->tail = true;
 
               // HANS: Additionals for packet reordering
+#ifdef PACKET_GRAN_ORDER
               int type = FindType(f->type);
               _reordering_vect[physical_source][message_destination][type]->send += 1;
+#endif
               
           } else {
               f->tail = false;
@@ -369,8 +376,9 @@ void FatMsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
   int physical_source = f->src / gC;
   int physical_dest = dest / gC;
 
-  if (f->head){
-    assert((f->dest / gC) == physical_dest);
+//   if (f->head){
+  if (f->tail){
+    // assert((f->dest / gC) == physical_dest);
     f->rtime = GetSimTime();
   }
 
@@ -381,9 +389,24 @@ void FatMsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
         // cout << GetSimTime() << " - Push message " << f->mid << " with sequence " << f->packet_seq << " to reordering buffer" << endl;
 //   }
 
-
+#ifdef PACKET_GRAN_ORDER
   _reordering_vect[physical_source][physical_dest][type]->q.push(f);
+#else
+  auto search = _reordering_vect[physical_source][physical_dest][type]->q.find(f->mid);
 
+  if (search == _reordering_vect[physical_source][physical_dest][type]->q.end()){ // Entry does not exists
+    priority_queue<Flit*, vector<Flit*>, Compare > temp;
+
+    auto temp_pair = make_pair(f->mid, make_pair(0, temp));
+
+    assert(_reordering_vect[physical_source][physical_dest][type]->q.insert(temp_pair).second);
+    search = _reordering_vect[physical_source][physical_dest][type]->q.find(f->mid);
+  }
+
+  search->second.second.push(f);
+#endif
+
+#ifdef PACKET_GRAN_ORDER
   while ((!_reordering_vect[physical_source][physical_dest][type]->q.empty()) && (_reordering_vect[physical_source][physical_dest][type]->q.top()->packet_seq == _reordering_vect[physical_source][physical_dest][type]->recv)){
     Flit* temp = _reordering_vect[physical_source][physical_dest][type]->q.top();
 
@@ -393,14 +416,45 @@ void FatMsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
 
       _reordering_vect[physical_source][physical_dest][type]->recv += 1;
     }
+#else
+  bool is_delete = false;
+
+  while ((!search->second.second.empty()) && (search->second.second.top()->packet_seq <= (unsigned)search->second.first)){
+    Flit* temp = search->second.second.top();
+
+    if (temp->tail)
+      search->second.first += 1;
+#endif
 
     _last_id = temp->id;
     _last_pid = temp->pid;
+
+    // HANS: For debugging
+    if (temp->tail){
+      if ((temp->dest / gC) == 0)
+        cout << GetSimTime() << " - Retire flit " << temp->id << ", pID: " << temp->pid << ", mID: " << temp->mid << ", Src: " << temp->src << ", Dest: " << temp->dest << ", CTime: " << temp->ctime << ", ITime: " << temp->itime << ", RLat: " << GetSimTime() - temp->rtime << ", OutPort: " << temp->out_port << ". Retired at: " << temp->rtime << endl;
+    }
     
     OriRetireFlit(temp, dest);
 
+#ifdef PACKET_GRAN_ORDER
     _reordering_vect[physical_source][physical_dest][type]->q.pop();
+#else
+    search->second.second.pop();
+
+    if ((temp->msg_tail) && (temp->tail)){
+      assert(search->second.second.empty());
+      is_delete = true;
+    }
+#endif
   }
+
+#ifndef PACKET_GRAN_ORDER
+  if (is_delete){
+    _reordering_vect[physical_source][physical_dest][type]->q.erase(search);
+  }
+#endif
+
 }
 
 void FatMsgBatchRateTrafficManager::OriRetireFlit( Flit *f, int dest )
@@ -446,8 +500,13 @@ void FatMsgBatchRateTrafficManager::OriRetireFlit( Flit *f, int dest )
 
     // HANS: Additionals for recording reordering latency
     // Packet latency does not include the reordering latency
-    if ( f->head ){
+    // if ( f->head ){
+    if (f->tail){
+
         if ((f->type == Flit::READ_REPLY) || (f->type == Flit::WRITE_REPLY)){ // Only record reply traffic 
+            // HANS: For debugging
+            // cout << "ID: " << f->id << ", Dest: " << f->dest << ", Rlat: " << GetSimTime() - f->rtime << endl;
+
             _rlat_stats[f->cl]->AddSample( GetSimTime() - f->rtime );
         }
 

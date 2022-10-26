@@ -89,7 +89,7 @@ void Flit::Reset()
   rtime    = -1 ;
 
   // HANS: Additionals for reordering
-  packet_seq = 0;
+  out_port = -1;
 }  
 
 Flit * Flit::New() {
