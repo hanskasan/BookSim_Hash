@@ -107,7 +107,7 @@ int BatchRateTrafficManager::_IssuePacket( int source, int cl )
         if((_injection_process[cl]->test(source)) && (_packet_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
         
 	        //coin toss to determine request type.
-	        result = (RandomFloat() < 0.5) ? 2 : 1;
+	        result = (RandomFloat() < _write_fraction[cl]) ? 2 : 1;
 
 	        _requestsOutstanding[source]++;
         }

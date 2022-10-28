@@ -132,6 +132,12 @@ public:
   virtual int dest(int source);
 };
 
+class ModuloWorstTrafficPattern : public RandomTrafficPattern {
+public:
+  ModuloWorstTrafficPattern(int nodes);
+  virtual int dest(int source);
+};
+
 class UniformBackgroundTrafficPattern : public RandomTrafficPattern {
 private:
   set<int> _excluded;

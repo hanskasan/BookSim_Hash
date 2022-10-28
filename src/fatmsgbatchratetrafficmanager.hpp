@@ -35,6 +35,8 @@ public:
 private:
   virtual void OriRetireFlit( Flit *f, int dest );
 
+  static const int _fat_ratio = 4;
+
 };
 
 #endif

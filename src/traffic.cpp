@@ -95,6 +95,8 @@ TrafficPattern * TrafficPattern::New(string const & pattern, int nodes,
     result = new UniformRandomTrafficPattern(nodes);
   } else if(pattern_name == "uniform_sel") {
     result = new UniformRandomSelectiveTrafficPattern(nodes);
+  } else if(pattern_name == "modulo_worst") {
+    result = new ModuloWorstTrafficPattern(nodes);
   } else if(pattern_name == "background") {
     vector<int> excludes = tokenize_int(params[0]);
     result = new UniformBackgroundTrafficPattern(nodes, excludes);
@@ -443,6 +445,27 @@ int UniformRandomSelectiveTrafficPattern::dest(int source)
   }
 
   return *temp;
+}
+
+ModuloWorstTrafficPattern::ModuloWorstTrafficPattern(int nodes)
+  : RandomTrafficPattern(nodes)
+{
+}
+
+int ModuloWorstTrafficPattern::dest(int source)
+{
+  assert((source >= 0) && (source < _nodes));
+  assert((_nodes % gK) == 0);
+  // assert(_active_nodes.count(source));
+  int const src_router = source/gK;
+  // int const dest_router = (src_router + 1) * gK;
+  int const dest_router = (source % gK) * gK;
+  // int dest = (dest_router + RandomInt(gK - 1)) % _nodes;
+  int dest = (dest_router + src_router) % _nodes;
+  // while(_active_nodes.count(dest) != 0) {
+  //   dest = (dest_router + RandomInt(gK - 1)) % _nodes;
+  // }
+  return dest;
 }
 
 UniformBackgroundTrafficPattern::UniformBackgroundTrafficPattern(int nodes, vector<int> excluded_nodes)

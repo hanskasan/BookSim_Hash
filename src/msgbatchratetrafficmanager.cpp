@@ -210,12 +210,10 @@ void MsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
     _last_pid = temp->pid;
 
     // HANS: For debugging
-    /*
-    if (temp->tail){
-      if (temp->dest == 0)
-        cout << GetSimTime() << " - Retire flit " << temp->id << ", pID: " << temp->pid << ", mID: " << temp->mid << ", Head: " << temp->head << ", Tail: " << temp->tail << ", Type: " << temp->type << ", RLat: " << GetSimTime() - temp->rtime << " from " << temp->src << ", OutPort: " << temp->out_port << ". Retired at: " << temp->rtime << endl;
-    }
-    */
+    // if (temp->tail){
+    //   if (temp->dest == 0)
+    //     cout << GetSimTime() << " - Retire flit " << temp->id << ", pID: " << temp->pid << ", mID: " << temp->mid << ", Head: " << temp->head << ", Tail: " << temp->tail << ", Type: " << temp->type << ", RLat: " << GetSimTime() - temp->rtime << " from " << temp->src << ", OutPort: " << temp->out_port << ". Retired at: " << temp->rtime << endl;
+    // }
 
     TrafficManager::_RetireFlit(temp, dest);
 
@@ -415,11 +413,9 @@ void MsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl,
           if (f->pid == pkt_watch_id) f->watch = true;
           */
 
-          /*
-          int flit_watch_id = 20272;
-          int flit_watch_id_2 = 20292;
+          int flit_watch_id = 37247;
+          int flit_watch_id_2 = 37271;
           if ((f->id == flit_watch_id) || (f->id == flit_watch_id_2)) f->watch = true;
-          */
 
           switch( _pri_type ) {
           case class_based:

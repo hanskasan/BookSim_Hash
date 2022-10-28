@@ -12,7 +12,7 @@ FatMsgBatchRateTrafficManager::FatMsgBatchRateTrafficManager( const Configuratio
 					  const vector<Network *> & net )
 : MsgBatchRateTrafficManager(config, net)
 {
-  _physical_nodes = gPhyNodes;
+  _physical_nodes = gNodes / _fat_ratio;
 
   // Injection queues
   _qtime.resize(_physical_nodes);
@@ -48,6 +48,9 @@ FatMsgBatchRateTrafficManager::FatMsgBatchRateTrafficManager( const Configuratio
   vector<int> temp_comp = {0, 1, 2};
   vector<int> temp_mem  = {3};
 
+//   vector<int> temp_comp = {0, 1, 2, 3, 4, 5};
+//   vector<int> temp_mem  = {6, 7};
+
   set<int> temp_set_comp(temp_comp.begin(), temp_comp.end());
   set<int> temp_set_mem (temp_mem.begin(),  temp_mem.end());
   _compute_nodes = temp_set_comp;
@@ -74,7 +77,7 @@ FatMsgBatchRateTrafficManager::FatMsgBatchRateTrafficManager( const Configuratio
   if(config.GetInt("injection_rate_uses_flits")) {
     for(int c = 0; c < _classes; ++c){
       _load[c] /= GetAverageMessageSize(c);
-      _load[c] *= gC;
+      _load[c] *= _fat_ratio;
     }
   }
 
@@ -132,7 +135,7 @@ int FatMsgBatchRateTrafficManager::IssueMessage( int physical_source, int cl )
 
 void FatMsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl, int time )
 {
-    int physical_source = source / gC;
+    int physical_source = source / _fat_ratio;
     assert((physical_source >= 0) && (physical_source < _physical_nodes));
     assert(stype!=0);
 
@@ -206,7 +209,7 @@ void FatMsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int 
       assert(_cur_pid);
 
       // Distribute packets across the fat node's input port
-      int temp_source = physical_source * gC + ((source + i) % gC);
+      int temp_source = physical_source * _fat_ratio + ((source + i) % _fat_ratio);
 
       if ( watch ) { 
         *gWatchOut << GetSimTime() << " | "
@@ -247,12 +250,12 @@ void FatMsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int 
           if ( j == 0 ) { // Head flit
               f->head = true;
               //packets are only generated to nodes smaller or equal to limit
-              f->dest = message_destination * gC + (f->src % gC);            
-            //   f->dest = message_destination * gC + RandomInt(gC - 1);            
+              f->dest = message_destination * _fat_ratio + (f->src % _fat_ratio);            
+            //   f->dest = message_destination * _fat_ratio + RandomInt(_fat_ratio - 1);            
           } else {
               f->head = false;
             //   f->dest = -1;
-              f->dest = message_destination * gC + (f->src % gC); // HANS: Just for debugging
+              f->dest = message_destination * _fat_ratio + (f->src % _fat_ratio); // HANS: Just for debugging
           }
 
           // HANS: For debugging
@@ -336,9 +339,9 @@ void FatMsgBatchRateTrafficManager::_Inject(){
 
             int empty_port;
             bool is_empty = false;
-            for ( int n = 0; n < gC; ++n ){
-                if (_partial_packets[phy * gC + n][c].empty()){
-                    empty_port = phy * gC + n;
+            for ( int n = 0; n < _fat_ratio; ++n ){
+                if (_partial_packets[phy * _fat_ratio + n][c].empty()){
+                    empty_port = phy * _fat_ratio + n;
                     is_empty = true;
                     break;
                 }
@@ -373,12 +376,12 @@ void FatMsgBatchRateTrafficManager::_Inject(){
 // HANS: Inherit _RetireFlit to enable reordering buffer
 void FatMsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
 {
-  int physical_source = f->src / gC;
-  int physical_dest = dest / gC;
+  int physical_source = f->src / _fat_ratio;
+  int physical_dest = dest / _fat_ratio;
 
 //   if (f->head){
   if (f->tail){
-    // assert((f->dest / gC) == physical_dest);
+    // assert((f->dest / _fat_ratio) == physical_dest);
     f->rtime = GetSimTime();
   }
 
@@ -431,7 +434,7 @@ void FatMsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
 
     // HANS: For debugging
     if (temp->tail){
-      if ((temp->dest / gC) == 0)
+      if ((temp->dest / _fat_ratio) == 0)
         cout << GetSimTime() << " - Retire flit " << temp->id << ", pID: " << temp->pid << ", mID: " << temp->mid << ", Src: " << temp->src << ", Dest: " << temp->dest << ", CTime: " << temp->ctime << ", ITime: " << temp->itime << ", RLat: " << GetSimTime() - temp->rtime << ", OutPort: " << temp->out_port << ". Retired at: " << temp->rtime << endl;
     }
     
@@ -459,8 +462,8 @@ void FatMsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
 
 void FatMsgBatchRateTrafficManager::OriRetireFlit( Flit *f, int dest )
 {
-    int physical_source = f->src / gC;
-    int physical_dest = dest / gC;
+    int physical_source = f->src /_fat_ratio;
+    int physical_dest = dest / _fat_ratio;
 
     _deadlock_timer = 0;
 
@@ -484,7 +487,7 @@ void FatMsgBatchRateTrafficManager::OriRetireFlit( Flit *f, int dest )
                    << ")." << endl;
     }
 
-    if ( f->head && ( f->dest / gC != physical_dest ) ) {
+    if ( f->head && ( f->dest / _fat_ratio != physical_dest ) ) {
         ostringstream err;
         err << "Flit " << f->id << " arrived at incorrect output " << dest;
         Error( err.str( ) );
@@ -546,7 +549,7 @@ void FatMsgBatchRateTrafficManager::OriRetireFlit( Flit *f, int dest )
         //code the source of request, look carefully, its tricky ;)
         if (f->type == Flit::READ_REQUEST || f->type == Flit::WRITE_REQUEST) {
             PacketReplyInfo* rinfo = PacketReplyInfo::New();
-            rinfo->source = f->src / gC;
+            rinfo->source = f->src / _fat_ratio;
             rinfo->time = f->atime;
             rinfo->record = f->record;
             rinfo->type = f->type;
@@ -555,7 +558,7 @@ void FatMsgBatchRateTrafficManager::OriRetireFlit( Flit *f, int dest )
             if(f->type == Flit::READ_REPLY || f->type == Flit::WRITE_REPLY  ){
                 _requestsOutstanding[physical_dest]--;
             } else if(f->type == Flit::ANY_TYPE) {
-                _requestsOutstanding[f->src / gC]--;
+                _requestsOutstanding[f->src / _fat_ratio]--;
             }
       
         }
