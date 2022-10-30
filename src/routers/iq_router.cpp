@@ -592,6 +592,11 @@ void IQRouter::_RouteEvaluate( )
     assert(f->vc == vc);
     assert(f->head);
 
+    // HANS: To track waiting time due to endpoint congestion
+    if (((f->dest / gC) + gK)== this->GetID()){
+      f->ewtime = GetSimTime();
+    }
+
     if(f->watch) {
       *gWatchOut << GetSimTime() << " | " << FullName() << " | "
 		 << "Beginning routing for VC " << vc
@@ -2093,6 +2098,13 @@ void IQRouter::_SWAllocUpdate( )
       }
 
       cur_buf->RemoveFlit(vc);
+
+      // HANS: To track waiting time due to endpoint congestion
+      if ((f->head) && (((f->dest / gC) + gK)== this->GetID())){
+        int temp = f->ewtime;
+        assert(temp >= 0);
+        f->ewtime = GetSimTime() - temp;
+      }
 
 #ifdef TRACK_FLOWS
       --_stored_flits[f->cl][input];

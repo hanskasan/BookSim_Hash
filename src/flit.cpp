@@ -86,6 +86,8 @@ void Flit::Reset()
   msg_head = false;
   msg_tail = false;
 
+  ewtime    = -1 ;
+
   rtime    = -1 ;
 
   // HANS: Additionals for reordering

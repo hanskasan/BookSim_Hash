@@ -218,6 +218,12 @@ protected:
   vector<double> _overall_avg_write_rlat;  
   vector<double> _overall_max_write_rlat;
 
+  // HANS: Endpoint waiting time statistics
+  vector<Stats *> _ewlat_stats;     
+  vector<double> _overall_min_ewlat;  
+  vector<double> _overall_avg_ewlat;  
+  vector<double> _overall_max_ewlat;
+
   // HANS: Channel utilization statistics
   static const int _num_channels = 32; // Uplink + downlink
   vector<vector<Stats *> >  _chanutil_stats;     

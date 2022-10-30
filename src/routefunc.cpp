@@ -370,8 +370,8 @@ void fattree_nca_sourcehash( const Router *r, const Flit *f,
     } else {
       //up ports are numbered last
       assert(in_channel<gK);//came from a up channel
-      out_port = gK + (f->src % gC);
-      // out_port = gK + ((f->src % gC) + (f->src / gC) % gC) % gC;
+      // out_port = gK + (f->src % gC);
+      out_port = gK + (((f->src % gC) + (f->src / gC)) % gC);
 
       // HANS: Debugging
       /*

@@ -512,6 +512,11 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     _overall_avg_write_rlat.resize(_classes, 0.0);
     _overall_max_write_rlat.resize(_classes, 0.0);
 
+    _ewlat_stats.resize(_classes);
+    _overall_min_ewlat.resize(_classes, 0.0);
+    _overall_avg_ewlat.resize(_classes, 0.0);
+    _overall_max_ewlat.resize(_classes, 0.0);
+
 
     if(_pair_stats){
         _pair_plat.resize(_classes);
@@ -612,6 +617,11 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
         tmp_name << "write_rlat_stat_" << c;
         _write_rlat_stats[c] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
         _stats[tmp_name.str()] = _write_rlat_stats[c];
+        tmp_name.str("");
+
+        tmp_name << "ewlat_stat_" << c;
+        _ewlat_stats[c] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
+        _stats[tmp_name.str()] = _ewlat_stats[c];
         tmp_name.str("");
 
         if(_pair_stats){
@@ -753,8 +763,12 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     // vector<int> temp_mem  = {4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
 
     // 2. Interleaved
-    vector<int> temp_comp = {0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14};
-    vector<int> temp_mem  = {3, 7, 11, 15};
+    // vector<int> temp_comp = {0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14};
+    // vector<int> temp_mem  = {3, 7, 11, 15};
+
+    // 3. No compute-memory
+    vector<int> temp_comp = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+    vector<int> temp_mem  = {};
 
 
     set<int> temp_set_comp(temp_comp.begin(), temp_comp.end());
@@ -785,6 +799,7 @@ TrafficManager::~TrafficManager( )
         delete _rlat_stats[c];
         delete _read_rlat_stats[c];
         delete _write_rlat_stats[c];
+        delete _ewlat_stats[c];
 
         delete _traffic_pattern[c];
         delete _injection_process[c];
@@ -868,6 +883,11 @@ void TrafficManager::_RetireFlit( Flit *f, int dest )
     _flat_stats[f->cl]->AddSample( f->atime - f->itime);
     if(_pair_stats){
         _pair_flat[f->cl][f->src*_nodes+dest]->AddSample( f->atime - f->itime );
+    }
+
+    // HANS: Additionals for recordering endpoint waiting time
+    if (f->head){
+        _ewlat_stats[f->cl]->AddSample( f->ewtime );
     }
 
     // HANS: Additionals for recording reordering latency
@@ -1140,7 +1160,7 @@ void TrafficManager::_GeneratePacket( int source, int stype,
         // int pkt_watch_id = 187;
         // if (f->pid == pkt_watch_id) f->watch = true;
 
-        // int flit_watch_id = 4;
+        // int flit_watch_id = 1;
         // if (f->id == flit_watch_id) f->watch = true;
 
         switch( _pri_type ) {
@@ -1611,6 +1631,7 @@ void TrafficManager::_ClearStats( )
         _rlat_stats[c]->Clear();
         _read_rlat_stats[c]->Clear();
         _write_rlat_stats[c]->Clear();
+        _ewlat_stats[c]->Clear();
 
         _sent_packets[c].assign(_nodes, 0);
         _accepted_packets[c].assign(_nodes, 0);
@@ -2043,6 +2064,10 @@ void TrafficManager::_UpdateOverallStats() {
         _overall_avg_write_rlat[c] += _write_rlat_stats[c]->Average();
         _overall_max_write_rlat[c] += _write_rlat_stats[c]->Max();
 
+        _overall_min_ewlat[c] += _ewlat_stats[c]->Min();
+        _overall_avg_ewlat[c] += _ewlat_stats[c]->Average();
+        _overall_max_ewlat[c] += _ewlat_stats[c]->Max();
+
         _overall_hop_stats[c] += _hop_stats[c]->Average();
         int count_min, count_sum, count_max;
         double rate_min, rate_sum, rate_max;
@@ -2328,21 +2353,27 @@ void TrafficManager::DisplayStats(ostream & os) const {
             << "Slowest flit = " << _slowest_flit[c] << endl
             << "Fragmentation average = " << _frag_stats[c]->Average() << endl
             << "\tminimum = " << _frag_stats[c]->Min() << endl
-            << "\tmaximum = " << _frag_stats[c]->Max() << endl
+            << "\tmaximum = " << _frag_stats[c]->Max() << endl;
 
         // HANS: Additionals for reordering latency
+        if (_use_read_write[c]){
+        cout
             << "Read packet latency average = " << _read_plat_stats[c]->Average() << endl
             << "\tminimum = " << _read_plat_stats[c]->Min() << endl
             << "\tmaximum = " << _read_plat_stats[c]->Max() << endl
 
             << "Write packet latency average = " << _write_plat_stats[c]->Average() << endl
             << "\tminimum = " << _write_plat_stats[c]->Min() << endl
-            << "\tmaximum = " << _write_plat_stats[c]->Max() << endl
+            << "\tmaximum = " << _write_plat_stats[c]->Max() << endl;
+        }
 
+        cout
             << "Reordering latency average = " << _rlat_stats[c]->Average() << endl
             << "\tminimum = " << _rlat_stats[c]->Min() << endl
-            << "\tmaximum = " << _rlat_stats[c]->Max() << endl
+            << "\tmaximum = " << _rlat_stats[c]->Max() << endl;
 
+        if (_use_read_write[c]){
+        cout
             << "Read reordering latency average = " << _read_rlat_stats[c]->Average() << endl
             << "\tminimum = " << _read_rlat_stats[c]->Min() << endl
             << "\tmaximum = " << _read_rlat_stats[c]->Max() << endl
@@ -2350,6 +2381,12 @@ void TrafficManager::DisplayStats(ostream & os) const {
             << "Write reordering latency average = " << _write_rlat_stats[c]->Average() << endl
             << "\tminimum = " << _write_rlat_stats[c]->Min() << endl
             << "\tmaximum = " << _write_rlat_stats[c]->Max() << endl;
+        }
+
+        cout
+            << "Endpoint waiting time average = " << _ewlat_stats[c]->Average() << endl
+            << "\tminimum = " << _ewlat_stats[c]->Min() << endl
+            << "\tmaximum = " << _ewlat_stats[c]->Max() << endl;
 
         // HANS: Additionals for request-reply traffic
 
@@ -2511,6 +2548,13 @@ void TrafficManager::DisplayOverallStats( ostream & os ) const {
         os << "\tminimum = " << _overall_min_write_rlat[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
         os << "\tmaximum = " << _overall_max_write_rlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Endpoint waiting latency average = " << _overall_avg_ewlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_ewlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_ewlat[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
 
         os << "Injected packet rate average = " << _overall_avg_sent_packets[c] / (double)_total_sims
