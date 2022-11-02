@@ -90,6 +90,9 @@ protected:
 
   virtual void _InternalStep() = 0;
 
+  // HANS: Additionals for hashing
+  mutable int _roundrobin;
+
 public:
   Router( const Configuration& config,
 	  Module *parent, const string & name, int id,
@@ -119,6 +122,12 @@ public:
   bool IsFaultyOutput( int c ) const;
 
   inline int GetID( ) const {return _id;}
+
+  // HANS: Additionals for hashing
+  inline void IncrementRROffset( int max ) const { 
+    _roundrobin = (_roundrobin + 1) % max;
+  }
+  inline int GetRROffset( ) const{ return _roundrobin; }
 
 
   virtual int GetUsedCredit(int o) const = 0;

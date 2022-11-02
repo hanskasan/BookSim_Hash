@@ -196,15 +196,13 @@ IQRouter::IQRouter( Configuration const & config, Module *parent,
     set<int> temp;
     temp.clear();
 
-    // cout << "Inserted: ";
     while(temp.size() < num_random){
       int rndm = RandomInt(gC - 1);
       temp.insert(rndm);
-      // cout << rndm << ", ";
     }
-    // cout << endl;
 
     _unique_random_set_vect[i] = temp;
+
   }
 
 }
@@ -591,6 +589,11 @@ void IQRouter::_RouteEvaluate( )
     assert(f);
     assert(f->vc == vc);
     assert(f->head);
+
+    // HANS: To track waiting time due to endpoint congestion
+    if (((f->src / gC) + gK)== this->GetID()){
+      f->uptime = GetSimTime();
+    }
 
     // HANS: To track waiting time due to endpoint congestion
     if (((f->dest / gC) + gK)== this->GetID()){
@@ -1021,6 +1024,14 @@ void IQRouter::_VCAllocUpdate( )
       if(!_speculative) {
 	_sw_alloc_vcs.push_back(make_pair(-1, make_pair(item.second.first, -1)));
       }
+
+      // HANS: To track waiting time due to uplink contention
+      if ((f->head) && (((f->src / gC) + gK)== this->GetID())){
+        int temp = f->uptime;
+        assert(temp >= 0);
+        f->uptime = GetSimTime() - temp;
+      }
+
     } else {
       if(f->watch) {
 	*gWatchOut << GetSimTime() << " | " << FullName() << " | "

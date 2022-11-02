@@ -88,6 +88,7 @@ public:
   bool msg_tail;
   int mid;
 
+  mutable int uptime; // Waiting time due to uplink contention
   mutable int ewtime; // Waiting time due to endpoint congestion
 
   int rtime; // Time when entering reordering buffer

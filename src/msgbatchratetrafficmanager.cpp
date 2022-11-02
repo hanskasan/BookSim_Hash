@@ -411,11 +411,11 @@ void MsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl,
           /*
           int pkt_watch_id = 1001;
           if (f->pid == pkt_watch_id) f->watch = true;
+          */
 
-          int flit_watch_id = 0;
+          int flit_watch_id = 1700;
           int flit_watch_id_2 = -1;
           if ((f->id == flit_watch_id) || (f->id == flit_watch_id_2)) f->watch = true;
-          */
 
           switch( _pri_type ) {
           case class_based:

@@ -218,6 +218,12 @@ protected:
   vector<double> _overall_avg_write_rlat;  
   vector<double> _overall_max_write_rlat;
 
+  // HANS: Uplink contention time statistics
+  vector<Stats *> _uplat_stats;     
+  vector<double> _overall_min_uplat;  
+  vector<double> _overall_avg_uplat;  
+  vector<double> _overall_max_uplat;
+  
   // HANS: Endpoint waiting time statistics
   vector<Stats *> _ewlat_stats;     
   vector<double> _overall_min_ewlat;  

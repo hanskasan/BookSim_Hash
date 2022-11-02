@@ -86,6 +86,7 @@ void Flit::Reset()
   msg_head = false;
   msg_tail = false;
 
+  uptime    = -1 ;
   ewtime    = -1 ;
 
   rtime    = -1 ;

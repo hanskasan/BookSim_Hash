@@ -365,6 +365,12 @@ RandomPermutationTrafficPattern::RandomPermutationTrafficPattern(int nodes,
 {
   _dest.resize(nodes);
   randomize(seed);
+
+  // HANS: For debugging
+  cout << "Random permutation src-dest pair" << endl;
+  for (int iter = 0; iter < nodes; iter++){
+    cout << "Source: " << iter << ", Dest: " << _dest[iter] << endl;
+  }
 }
 
 void RandomPermutationTrafficPattern::randomize(int seed)

@@ -512,6 +512,11 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     _overall_avg_write_rlat.resize(_classes, 0.0);
     _overall_max_write_rlat.resize(_classes, 0.0);
 
+    _uplat_stats.resize(_classes);
+    _overall_min_uplat.resize(_classes, 0.0);
+    _overall_avg_uplat.resize(_classes, 0.0);
+    _overall_max_uplat.resize(_classes, 0.0);
+
     _ewlat_stats.resize(_classes);
     _overall_min_ewlat.resize(_classes, 0.0);
     _overall_avg_ewlat.resize(_classes, 0.0);
@@ -617,6 +622,11 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
         tmp_name << "write_rlat_stat_" << c;
         _write_rlat_stats[c] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
         _stats[tmp_name.str()] = _write_rlat_stats[c];
+        tmp_name.str("");
+
+        tmp_name << "uplat_stat_" << c;
+        _uplat_stats[c] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
+        _stats[tmp_name.str()] = _uplat_stats[c];
         tmp_name.str("");
 
         tmp_name << "ewlat_stat_" << c;
@@ -799,6 +809,7 @@ TrafficManager::~TrafficManager( )
         delete _rlat_stats[c];
         delete _read_rlat_stats[c];
         delete _write_rlat_stats[c];
+        delete _uplat_stats[c];
         delete _ewlat_stats[c];
 
         delete _traffic_pattern[c];
@@ -887,6 +898,12 @@ void TrafficManager::_RetireFlit( Flit *f, int dest )
 
     // HANS: Additionals for recordering endpoint waiting time
     if (f->head){
+        if ((f->src / gC) != (f->dest / gC)){
+            _uplat_stats[f->cl]->AddSample( f->uptime );
+
+            // if ((f->src / gC) == 0)
+                // cout << GetSimTime() << "- Uptime: " << f->uptime << ", fID: " << f->id << endl;
+        }
         _ewlat_stats[f->cl]->AddSample( f->ewtime );
     }
 
@@ -1631,6 +1648,7 @@ void TrafficManager::_ClearStats( )
         _rlat_stats[c]->Clear();
         _read_rlat_stats[c]->Clear();
         _write_rlat_stats[c]->Clear();
+        _uplat_stats[c]->Clear();
         _ewlat_stats[c]->Clear();
 
         _sent_packets[c].assign(_nodes, 0);
@@ -2064,6 +2082,10 @@ void TrafficManager::_UpdateOverallStats() {
         _overall_avg_write_rlat[c] += _write_rlat_stats[c]->Average();
         _overall_max_write_rlat[c] += _write_rlat_stats[c]->Max();
 
+        _overall_min_uplat[c] += _uplat_stats[c]->Min();
+        _overall_avg_uplat[c] += _uplat_stats[c]->Average();
+        _overall_max_uplat[c] += _uplat_stats[c]->Max();
+
         _overall_min_ewlat[c] += _ewlat_stats[c]->Min();
         _overall_avg_ewlat[c] += _ewlat_stats[c]->Average();
         _overall_max_ewlat[c] += _ewlat_stats[c]->Max();
@@ -2384,6 +2406,11 @@ void TrafficManager::DisplayStats(ostream & os) const {
         }
 
         cout
+            << "Uplink contention time average = " << _uplat_stats[c]->Average() << endl
+            << "\tminimum = " << _uplat_stats[c]->Min() << endl
+            << "\tmaximum = " << _uplat_stats[c]->Max() << endl;
+
+        cout
             << "Endpoint waiting time average = " << _ewlat_stats[c]->Average() << endl
             << "\tminimum = " << _ewlat_stats[c]->Min() << endl
             << "\tmaximum = " << _ewlat_stats[c]->Max() << endl;
@@ -2550,6 +2577,13 @@ void TrafficManager::DisplayOverallStats( ostream & os ) const {
         os << "\tmaximum = " << _overall_max_write_rlat[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
 
+        os << "Uplink waiting latency average = " << _overall_avg_uplat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_uplat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_uplat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
         os << "Endpoint waiting latency average = " << _overall_avg_ewlat[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
         os << "\tminimum = " << _overall_min_ewlat[c] / (double)_total_sims
@@ -2597,7 +2631,7 @@ void TrafficManager::DisplayOverallStats( ostream & os ) const {
         // HANS: Additionals
         // PrintPlatDistribution();
         // PrintNlatDistribution();
-        PrintRlatDistribution();
+        // PrintRlatDistribution();
     
 #ifdef TRACK_STALLS
         os << "Buffer busy stall rate = " << (double)_overall_buffer_busy_stalls[c] / (double)_total_sims
