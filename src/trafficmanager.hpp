@@ -79,11 +79,14 @@ class TrafficManager : public Module {
 
 private:
 
-  vector<vector<int> > _packet_size;
+  // vector<vector<int> > _packet_size; // HANS: Change to protected to enable inheritance
   vector<vector<int> > _packet_size_rate;
   vector<int> _packet_size_max_val;
 
 protected:
+
+  vector<vector<int> > _packet_size;
+
   int _nodes;
   int _routers;
   int _vcs;

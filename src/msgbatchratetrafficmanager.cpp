@@ -113,8 +113,10 @@ MsgBatchRateTrafficManager::MsgBatchRateTrafficManager( const Configuration &con
   }
 
   if(config.GetInt("injection_rate_uses_flits")) {
-    for(int c = 0; c < _classes; ++c)
+    for(int c = 0; c < _classes; ++c){
+      // cout << "LOAD TEST: " << _load[c] << ", " << GetAverageMessageSize(c) << endl;
       _load[c] /= GetAverageMessageSize(c);
+    }
   }
 
   // HANS: Get injection rate and process
@@ -252,7 +254,8 @@ int MsgBatchRateTrafficManager::IssueMessage( int source, int cl )
 	      result = -1;
       }
     } else {
-      if (_compute_nodes.count(source) > 0){
+      // if (_compute_nodes.count(source) > 0){
+      if (1){
         if((_injection_process[cl]->test(source)) && (_message_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
 	        //coin toss to determine request type.
 	        // result = (RandomFloat() < _write_fraction[cl]) ? 2 : 1;
@@ -265,7 +268,8 @@ int MsgBatchRateTrafficManager::IssueMessage( int source, int cl )
       }
     }
   } else { //normal
-    if (_compute_nodes.count(source) > 0){
+    // if (_compute_nodes.count(source) > 0){
+    if (1){
       if((_injection_process[cl]->test(source)) && (_message_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
         result = GetNextMessageSize(cl);
         _requestsOutstanding[source]++;
@@ -413,9 +417,9 @@ void MsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl,
           if (f->pid == pkt_watch_id) f->watch = true;
           */
 
-          int flit_watch_id = 1700;
-          int flit_watch_id_2 = -1;
-          if ((f->id == flit_watch_id) || (f->id == flit_watch_id_2)) f->watch = true;
+          // int flit_watch_id = 1700;
+          // int flit_watch_id_2 = -1;
+          // if ((f->id == flit_watch_id) || (f->id == flit_watch_id_2)) f->watch = true;
 
           switch( _pri_type ) {
           case class_based:
@@ -529,7 +533,8 @@ bool MsgBatchRateTrafficManager::_SingleSim( )
       batch_complete = true;
       for(int i = 0; i < _nodes; ++i) {
       // HANS: Additionals
-        if (_compute_nodes.count(i) > 0){
+        // if (_compute_nodes.count(i) > 0){
+        if (1){  
           if (_message_seq_no[i] < _batch_size) {
 	          batch_complete = false;
 	          break;
@@ -659,13 +664,25 @@ int MsgBatchRateTrafficManager::GetNextMessageSize(int cl) const
 
 double MsgBatchRateTrafficManager::GetAverageMessageSize(int cl) const
 {
+    int sizes;
+
     vector<int> const & msize = _message_size[cl];
-    int sizes = msize.size();
+    sizes = msize.size();
     assert(sizes == 1); // HANS: Just for now..
     // if(sizes == 1) {
-        return (double)msize[0];
+    double message_size = (double)msize[0];
     // }
     
+    vector<int> const & psize = _packet_size[cl];
+    sizes = psize.size();
+    assert(sizes == 1); // HANS: Just for now..
+
+    // if(sizes == 1) {
+    double packet_size = (double)psize[0];
+    // }
+
+    return message_size * packet_size;
+
     /*
     vector<int> const & prate = _packet_size_rate[cl];
     int sum = 0;

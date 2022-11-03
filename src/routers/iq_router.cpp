@@ -190,15 +190,19 @@ IQRouter::IQRouter( Configuration const & config, Module *parent,
     _unique_random_vect[i] = i;
   }
 
-  unsigned long num_random = 3;
+  unsigned long num_random = 2;
   _unique_random_set_vect.resize(gC);
   for (int i = 0; i < gC; i++){
     set<int> temp;
     temp.clear();
 
+    int j = 0;
     while(temp.size() < num_random){
-      int rndm = RandomInt(gC - 1);
-      temp.insert(rndm);
+      // int rndm = RandomInt(gC - 1);
+      int port = 2 * (i / 2) + j;
+      // cout << "From: " << i << " to: " << port << endl;
+      temp.insert(port);
+      j += 1;
     }
 
     _unique_random_set_vect[i] = temp;

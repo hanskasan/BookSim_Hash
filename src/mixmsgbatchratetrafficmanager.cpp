@@ -602,12 +602,24 @@ int MixMsgBatchRateTrafficManager::GetNextMessageSize(int cl) const
 
 double MixMsgBatchRateTrafficManager::GetAverageMessageSize(int cl) const
 {
+    int sizes;
+
     vector<int> const & msize = _message_size[cl];
-    int sizes = msize.size();
+    sizes = msize.size();
     assert(sizes == 1); // HANS: Just for now..
     // if(sizes == 1) {
-        return (double)msize[0];
+    double message_size = (double)msize[0];
     // }
+    
+    vector<int> const & psize = _packet_size[cl];
+    sizes = psize.size();
+    assert(sizes == 1); // HANS: Just for now..
+
+    // if(sizes == 1) {
+    double packet_size = (double)psize[0];
+    // }
+
+    return message_size * packet_size;
     
     /*
     vector<int> const & prate = _packet_size_rate[cl];

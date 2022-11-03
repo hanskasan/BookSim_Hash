@@ -222,8 +222,10 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     _load.resize(_classes, _load.back());
 
     if(config.GetInt("injection_rate_uses_flits")) {
-        for(int c = 0; c < _classes; ++c)
+        for(int c = 0; c < _classes; ++c){
+            // cout << "LOAD TEST: " << _load[c] << ", " << _GetAveragePacketSize(c) << endl;
             _load[c] /= _GetAveragePacketSize(c);
+        }
     }
 
     _traffic = config.GetStrArray("traffic");
