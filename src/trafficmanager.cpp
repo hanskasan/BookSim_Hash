@@ -729,8 +729,8 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     // if (_num_memory_nodes < 0) _num_compute_nodes = _nodes;
 
     assert(_num_compute_nodes > 0);
-    assert(_num_memory_nodes > 0);
-    assert((_num_compute_nodes + _num_memory_nodes) <= _nodes);
+    assert(_num_memory_nodes >= 0);
+    assert((_num_compute_nodes + _num_memory_nodes) == _nodes);
 
     // THO: Compute and memory node selection
     /*
@@ -766,27 +766,39 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     }
     */
 
-    // HANS: Manual compute and memory node selection
-    // 1. Clustered
-    vector<int> temp_comp = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
-    vector<int> temp_mem  = {12, 13, 14, 15};
 
-    // vector<int> temp_comp = {0, 1, 2, 3};
-    // vector<int> temp_mem  = {4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+    // THO: Use parameters to choose node
+    vector<int> temp_comp;
+    vector<int> temp_mem;
+    // 1. Clustered or No compute-memory
+    // for (int c = 0; c < _num_compute_nodes; c++)
+    //     temp_comp.push_back(c);
+
+    // for (int m = 0; m < _num_memory_nodes; m++)
+    //     temp_mem.push_back(_nodes - m);
 
     // 2. Interleaved
-    // vector<int> temp_comp = {0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14};
-    // vector<int> temp_mem  = {3, 7, 11, 15};
+    assert(_num_memory_nodes % gK == 0);    // Tho: For now, only support mem at every router for evaluation fairness
+    assert(_num_compute_nodes % gK == 0);   // Tho: For now, only support mem at every router for evaluation fairness
+    int compute_node = 0;
+    while (temp_comp.size() < _num_compute_nodes) {
+        temp_comp.push_back(compute_node);
+        compute_node = (compute_node > (_nodes - gK - 1)) ? compute_node - (_nodes - gK - 1) : compute_node + gK;
+    }
+    int memory_node = _nodes - 1;
+    while (temp_mem.size() < _num_memory_nodes) {
+        temp_mem.push_back(memory_node);
+        memory_node = (memory_node < gK) ? memory_node + (_nodes - gK - 1) : memory_node - gK;
+    }
 
-    // 3. No compute-memory
-    // vector<int> temp_comp = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-    // vector<int> temp_mem  = {};
-
+    assert((temp_comp.size() + temp_mem.size()) == _nodes); // Assertion of nodes selection
+    // Finish choosing nodes ---
 
     set<int> temp_set_comp(temp_comp.begin(), temp_comp.end());
     set<int> temp_set_mem (temp_mem.begin(),  temp_mem.end());
     _compute_nodes = temp_set_comp;
     _memory_nodes  = temp_set_mem;
+    assert((_compute_nodes.size() + _memory_nodes.size()) == _nodes);
 }
 
 TrafficManager::~TrafficManager( )
@@ -1073,12 +1085,15 @@ void TrafficManager::_GeneratePacket( int source, int stype,
                                       int cl, int time )
 {
     assert(stype!=0);
+    int packet_destination;
 
     Flit::FlitType packet_type = Flit::ANY_TYPE;
     int size = _GetNextPacketSize(cl); //input size 
     int pid = _cur_pid++;
     assert(_cur_pid);
-    int packet_destination = _traffic_pattern[cl]->dest(source);
+    // THO: workaround glitch in compute-memory traffic
+    if (stype > 0)
+        packet_destination = _traffic_pattern[cl]->dest(source);
     bool record = false;
     bool watch = gWatchOut && (_packets_to_watch.count(pid) > 0);
     if(_use_read_write[cl]){
