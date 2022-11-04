@@ -250,11 +250,14 @@ int MixMsgBatchRateTrafficManager::IssueMessage( int source, int cl )
 void MixMsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl, int time )
 {
     assert(stype!=0);
+    int message_destination;
 
     Flit::FlitType message_type = Flit::ANY_TYPE;
     int message_size = GetNextMessageSize(cl); //in packets
     int packet_size = _GetNextPacketSize(cl); //in flits
-    int message_destination = _traffic_pattern[cl]->dest(source);
+    // THO: workaround glitch in compute-memory traffic
+    if (stype > 0)
+      message_destination = _traffic_pattern[cl]->dest(source);
     bool record = false;
     // bool watch = gWatchOut && (_packets_to_watch.count(pid) > 0); // HANS: Disabled for now
     bool watch = false;

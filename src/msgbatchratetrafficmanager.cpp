@@ -109,22 +109,6 @@ MsgBatchRateTrafficManager::MsgBatchRateTrafficManager( const Configuration &con
                               _write_request_message_size[c] * _write_request_size[c] + _write_reply_message_size[c] * _write_reply_size[c]) / 2);
           // _message_size_rate[c] = vector<int>(1, 1);
           // _message_size_max_val[c] = 0;
-      } else {
-          int sizes;
-
-          vector<int> const & msize = _message_size[c];
-          sizes = msize.size();
-          assert(sizes == 1); // HANS: Just for now..
-          // if(sizes == 1) {
-          double message_size = (double)msize[0];
-
-          vector<int> const & psize = _packet_size[c];
-          sizes = psize.size();
-          assert(sizes == 1); // HANS: Just for now..
-
-          double packet_size = (double)psize[0];
-
-          _message_size[c] = vector<int>(1, (message_size * packet_size));
       }
   }
 
@@ -302,11 +286,14 @@ int MsgBatchRateTrafficManager::IssueMessage( int source, int cl )
 void MsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl, int time )
 {
     assert(stype!=0);
+    int message_destination;
 
     Flit::FlitType message_type = Flit::ANY_TYPE;
     int message_size = GetNextMessageSize(cl); //in packets
     int packet_size = _GetNextPacketSize(cl); //in flits
-    int message_destination = _traffic_pattern[cl]->dest(source);
+    // THO: workaround glitch in compute-memory traffic
+    if (stype > 0)
+      message_destination = _traffic_pattern[cl]->dest(source);
     bool record = false;
     // bool watch = gWatchOut && (_packets_to_watch.count(pid) > 0); // HANS: Disabled for now
     bool watch = false;
@@ -681,25 +668,19 @@ int MsgBatchRateTrafficManager::GetNextMessageSize(int cl) const
 double MsgBatchRateTrafficManager::GetAverageMessageSize(int cl) const
 {
     int sizes;
-
     vector<int> const & msize = _message_size[cl];
     sizes = msize.size();
     assert(sizes == 1); // HANS: Just for now..
-    // if(sizes == 1) {
     double message_size = (double)msize[0];
-    // }
-    
-    // vector<int> const & psize = _packet_size[cl];
-    // sizes = psize.size();
-    // assert(sizes == 1); // HANS: Just for now..
-
-    // if(sizes == 1) {
-    // double packet_size = (double)psize[0];
-    // }
-
-    // return message_size * packet_size;
-    return message_size;
-
+    if (_use_read_write[cl]){
+      return message_size;
+    } else {
+      vector<int> const & psize = _packet_size[cl];
+      sizes = psize.size();
+      assert(sizes == 1); // HANS: Just for now..
+      double packet_size = (double)psize[0];
+      return message_size * packet_size;
+    }
     /*
     vector<int> const & prate = _packet_size_rate[cl];
     int sum = 0;
