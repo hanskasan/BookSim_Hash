@@ -109,12 +109,28 @@ MsgBatchRateTrafficManager::MsgBatchRateTrafficManager( const Configuration &con
                               _write_request_message_size[c] * _write_request_size[c] + _write_reply_message_size[c] * _write_reply_size[c]) / 2);
           // _message_size_rate[c] = vector<int>(1, 1);
           // _message_size_max_val[c] = 0;
+      } else {
+          int sizes;
+
+          vector<int> const & msize = _message_size[c];
+          sizes = msize.size();
+          assert(sizes == 1); // HANS: Just for now..
+          // if(sizes == 1) {
+          double message_size = (double)msize[0];
+
+          vector<int> const & psize = _packet_size[c];
+          sizes = psize.size();
+          assert(sizes == 1); // HANS: Just for now..
+
+          double packet_size = (double)psize[0];
+
+          _message_size[c] = vector<int>(1, (message_size * packet_size));
       }
   }
 
   if(config.GetInt("injection_rate_uses_flits")) {
     for(int c = 0; c < _classes; ++c){
-      // cout << "LOAD TEST: " << _load[c] << ", " << GetAverageMessageSize(c) << endl;
+      cout << "LOAD TEST: " << _load[c] << ", " << GetAverageMessageSize(c) << endl;
       _load[c] /= GetAverageMessageSize(c);
     }
   }
@@ -254,22 +270,22 @@ int MsgBatchRateTrafficManager::IssueMessage( int source, int cl )
 	      result = -1;
       }
     } else {
-      // if (_compute_nodes.count(source) > 0){
-      if (1){
+      if (_compute_nodes.count(source) > 0){
+      // if (1){
         if((_injection_process[cl]->test(source)) && (_message_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
 	        //coin toss to determine request type.
-	        // result = (RandomFloat() < _write_fraction[cl]) ? 2 : 1;
+	        result = (RandomFloat() < _write_fraction[cl]) ? 2 : 1;
 
           // HANS: Mixed read and write random
-          result = (source % 2) + 1;
+          // result = (source % 2) + 1;
 
 	        _requestsOutstanding[source]++;
         }
       }
     }
   } else { //normal
-    // if (_compute_nodes.count(source) > 0){
-    if (1){
+    if (_compute_nodes.count(source) > 0){
+    // if (1){
       if((_injection_process[cl]->test(source)) && (_message_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
         result = GetNextMessageSize(cl);
         _requestsOutstanding[source]++;
@@ -533,8 +549,8 @@ bool MsgBatchRateTrafficManager::_SingleSim( )
       batch_complete = true;
       for(int i = 0; i < _nodes; ++i) {
       // HANS: Additionals
-        // if (_compute_nodes.count(i) > 0){
-        if (1){  
+        if (_compute_nodes.count(i) > 0){
+        // if (1){  
           if (_message_seq_no[i] < _batch_size) {
 	          batch_complete = false;
 	          break;
@@ -673,15 +689,16 @@ double MsgBatchRateTrafficManager::GetAverageMessageSize(int cl) const
     double message_size = (double)msize[0];
     // }
     
-    vector<int> const & psize = _packet_size[cl];
-    sizes = psize.size();
-    assert(sizes == 1); // HANS: Just for now..
+    // vector<int> const & psize = _packet_size[cl];
+    // sizes = psize.size();
+    // assert(sizes == 1); // HANS: Just for now..
 
     // if(sizes == 1) {
-    double packet_size = (double)psize[0];
+    // double packet_size = (double)psize[0];
     // }
 
-    return message_size * packet_size;
+    // return message_size * packet_size;
+    return message_size;
 
     /*
     vector<int> const & prate = _packet_size_rate[cl];

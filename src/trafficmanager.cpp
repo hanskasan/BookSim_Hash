@@ -768,8 +768,8 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
 
     // HANS: Manual compute and memory node selection
     // 1. Clustered
-    // vector<int> temp_comp = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
-    // vector<int> temp_mem  = {12, 13, 14, 15};
+    vector<int> temp_comp = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+    vector<int> temp_mem  = {12, 13, 14, 15};
 
     // vector<int> temp_comp = {0, 1, 2, 3};
     // vector<int> temp_mem  = {4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
@@ -779,8 +779,8 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     // vector<int> temp_mem  = {3, 7, 11, 15};
 
     // 3. No compute-memory
-    vector<int> temp_comp = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-    vector<int> temp_mem  = {};
+    // vector<int> temp_comp = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+    // vector<int> temp_mem  = {};
 
 
     set<int> temp_set_comp(temp_comp.begin(), temp_comp.end());

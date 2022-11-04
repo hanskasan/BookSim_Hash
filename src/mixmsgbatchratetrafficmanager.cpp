@@ -103,6 +103,22 @@ MixMsgBatchRateTrafficManager::MixMsgBatchRateTrafficManager( const Configuratio
                               _write_request_message_size[c] * _write_request_size[c] + _write_reply_message_size[c] * _write_reply_size[c]) / 2);
           // _message_size_rate[c] = vector<int>(1, 1);
           // _message_size_max_val[c] = 0;
+      } else {
+          int sizes;
+
+          vector<int> const & msize = _message_size[c];
+          sizes = msize.size();
+          assert(sizes == 1); // HANS: Just for now..
+          // if(sizes == 1) {
+          double message_size = (double)msize[0];
+
+          vector<int> const & psize = _packet_size[c];
+          sizes = psize.size();
+          assert(sizes == 1); // HANS: Just for now..
+
+          double packet_size = (double)psize[0];
+
+          _message_size[c] = vector<int>(1, (message_size * packet_size));
       }
   }
 
@@ -611,15 +627,16 @@ double MixMsgBatchRateTrafficManager::GetAverageMessageSize(int cl) const
     double message_size = (double)msize[0];
     // }
     
-    vector<int> const & psize = _packet_size[cl];
-    sizes = psize.size();
-    assert(sizes == 1); // HANS: Just for now..
+    // vector<int> const & psize = _packet_size[cl];
+    // sizes = psize.size();
+    // assert(sizes == 1); // HANS: Just for now..
 
     // if(sizes == 1) {
-    double packet_size = (double)psize[0];
+    // double packet_size = (double)psize[0];
     // }
 
-    return message_size * packet_size;
+    // return message_size * packet_size;
+    return message_size;
     
     /*
     vector<int> const & prate = _packet_size_rate[cl];
