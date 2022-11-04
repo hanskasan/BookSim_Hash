@@ -132,6 +132,22 @@ public:
   virtual int dest(int source);
 };
 
+// THO: Selective Adversarial
+class AdversarialRandomSelectiveTrafficPattern : public RandomTrafficPattern {
+public:
+  AdversarialRandomSelectiveTrafficPattern(int nodes);
+  virtual int dest(int source);
+};
+
+// THO: Selective Permutation
+class PermRandomSelectiveTrafficPattern : public RandomTrafficPattern {
+private:
+  vector<int> _dest;
+public:
+  PermRandomSelectiveTrafficPattern(int nodes);
+  virtual int dest(int source);
+};
+
 class ModuloWorstTrafficPattern : public RandomTrafficPattern {
 public:
   ModuloWorstTrafficPattern(int nodes);

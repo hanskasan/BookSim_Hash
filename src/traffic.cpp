@@ -95,6 +95,10 @@ TrafficPattern * TrafficPattern::New(string const & pattern, int nodes,
     result = new UniformRandomTrafficPattern(nodes);
   } else if(pattern_name == "uniform_sel") {
     result = new UniformRandomSelectiveTrafficPattern(nodes);
+  } else if (pattern_name == "randperm_sel") {
+    result = new PermRandomSelectiveTrafficPattern(nodes);
+  } else if (pattern_name == "adversarial_sel") {
+    result = new AdversarialRandomSelectiveTrafficPattern(nodes);
   } else if(pattern_name == "modulo_worst") {
     result = new ModuloWorstTrafficPattern(nodes);
   } else if(pattern_name == "background") {
@@ -106,33 +110,6 @@ TrafficPattern * TrafficPattern::New(string const & pattern, int nodes,
     result = new AsymmetricTrafficPattern(nodes);
   } else if(pattern_name == "taper64") {
     result = new Taper64TrafficPattern(nodes);
-  } else if (pattern_name == "bad_fattree") { // HANS: Adversarial traffic for 1D flattened butterfly
-    bool missing_params = false;
-    int k = -1;
-    if(params.size() < 1) {
-      if(config) {
-        k = config->GetInt("k");
-      } else {
-        missing_params = true;
-      }
-    } else {
-      k = atoi(params[0].c_str());
-    }
-    int n = -1;
-    if(params.size() < 2) {
-      if(config) {
-        n = config->GetInt("n");
-      } else {
-        missing_params = true;
-      }
-    } else {
-      n = atoi(params[1].c_str());
-    }
-    if(missing_params) {
-      cout << "Error: Missing parameters for fattree bad permutation traffic pattern: " << pattern << endl;
-      exit(-1);
-    }
-    result = new BadFatTreeTrafficPattern(nodes, k, n);
   } else if (pattern_name == "bad_flatfly") { // HANS: Adversarial traffic for 1D flattened butterfly
     bool missing_params = false;
     int k = -1;
@@ -453,6 +430,7 @@ int UniformRandomTrafficPattern::dest(int source)
   return RandomInt(_nodes - 1);
 }
 
+// THO: Select destination using _active_nodes (UR)
 UniformRandomSelectiveTrafficPattern::UniformRandomSelectiveTrafficPattern(int nodes)
   : RandomTrafficPattern(nodes)
 {
@@ -461,25 +439,87 @@ UniformRandomSelectiveTrafficPattern::UniformRandomSelectiveTrafficPattern(int n
 int UniformRandomSelectiveTrafficPattern::dest(int source)
 {
   assert((source >= 0) && (source < _nodes));
+  // assert(_compute_nodes.count(source));
   
   // THO: Select destination only from _memory_nodes
-  // int rand_dest = RandomInt(_nodes-1);
-  // while(_memory_nodes.count(rand_dest) == 0) {
-  //   rand_dest = RandomInt(_nodes-1);
-  // }
-
-  // return rand_dest;
-
-  // HANS: Select destination only from _memory_nodes
-  int rand = RandomInt(_memory_nodes.size() - 1);
-  set<int>::iterator temp = _memory_nodes.begin();
-  for (int iter = 0; iter < rand; iter++){
-    temp++;
+  int rand_dest = RandomInt(_nodes-1);
+  while(_memory_nodes.count(rand_dest) == 0) {
+    rand_dest = RandomInt(_nodes-1);
   }
 
-  return *temp;
+  return rand_dest;
+
+  // // HANS: Select destination only from _memory_nodes
+  // int rand = RandomInt(_memory_nodes.size() - 1);
+  // set<int>::iterator temp = _memory_nodes.begin();
+  // for (int iter = 0; iter < rand; iter++){
+  //   temp++;
+  // }
+
+  // return *temp;
 }
 
+// THO: Select destination using _active_nodes (AD)
+AdversarialRandomSelectiveTrafficPattern::AdversarialRandomSelectiveTrafficPattern(int nodes)
+  : RandomTrafficPattern(nodes)
+{
+}
+
+int AdversarialRandomSelectiveTrafficPattern::dest(int source)
+{
+  assert((source >= 0) && (source < _nodes));
+  assert((_nodes % gK) == 0);
+  assert(_compute_nodes.count(source));
+
+  int const src_router = source/gK;
+  // Change this dest_router if running clustered
+  int const dest_router = (src_router + 1) * gK;
+
+  int dest = (dest_router + RandomInt(gK - 1)) % _nodes;
+
+  while(_compute_nodes.count(dest) != 0) {
+    dest = (dest_router + RandomInt(gK - 1)) % _nodes;
+  }
+
+  return dest;
+}
+
+// THO: Select destination using _compute_nodes (PERM)
+// Unlike randperm, there will be endpoint congestion here
+PermRandomSelectiveTrafficPattern::PermRandomSelectiveTrafficPattern(int nodes)
+  : RandomTrafficPattern(nodes)
+{
+}
+
+int PermRandomSelectiveTrafficPattern::dest(int source)
+{
+  assert((source >= 0) && (source < _nodes));
+  assert((_nodes % gK) == 0);
+  assert(_compute_nodes.count(source));
+
+  set<int> dest_list = _memory_nodes;
+
+  if (_dest.empty()) {
+    _dest.resize(_nodes);
+    for(int src = 0; src < _nodes; src++) {
+      if(_compute_nodes.count(source) == 0) {
+        _dest[src] = -1;
+      }
+      else {
+        int rand_dest = RandomInt(_nodes-1);
+        while(_compute_nodes.count(rand_dest) != 0) {
+          rand_dest = RandomInt(_nodes-1);
+        }
+        _dest[src] = rand_dest;
+      }
+    }
+  }
+
+  assert(_dest[source] != -1);
+  return _dest[source];
+}
+
+// THO: Worst case for Source and Destination hashing (*All equal nodes*)
 ModuloWorstTrafficPattern::ModuloWorstTrafficPattern(int nodes)
   : RandomTrafficPattern(nodes)
 {
@@ -489,15 +529,11 @@ int ModuloWorstTrafficPattern::dest(int source)
 {
   assert((source >= 0) && (source < _nodes));
   assert((_nodes % gK) == 0);
-  // assert(_active_nodes.count(source));
+
   int const src_router = source/gK;
-  // int const dest_router = (src_router + 1) * gK;
   int const dest_router = (source % gK) * gK;
-  // int dest = (dest_router + RandomInt(gK - 1)) % _nodes;
   int dest = (dest_router + src_router) % _nodes;
-  // while(_active_nodes.count(dest) != 0) {
-  //   dest = (dest_router + RandomInt(gK - 1)) % _nodes;
-  // }
+
   return dest;
 }
 
@@ -567,28 +603,6 @@ int Taper64TrafficPattern::dest(int source)
   } else {
     return RandomInt(_nodes - 1);
   }
-}
-
-// HANS: Adversarial traffic for FatTree
-BadFatTreeTrafficPattern::BadFatTreeTrafficPattern(int nodes, int k, int n)
-  : DigitPermutationTrafficPattern(nodes, k, n, 1)
-{
-}
-
-int BadFatTreeTrafficPattern::dest(int source)
-{
-  assert((source >= 0) && (source < _nodes));
-  assert((_nodes % _k) == 0);
-
-  int const c = _nodes/_k;
-  int const src_router = source/c;
-  int const dest_router = (src_router + 1) % _k;
-
-  int dest = ((dest_router * c) + RandomInt(c - 1));
-
-  // cout << "Source: " << source << ", Dest: " << dest << endl;
-
-  return dest;
 }
 
 // HANS: Adversarial traffic for 1D flattened butterfly
