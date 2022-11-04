@@ -201,6 +201,9 @@ public:
   virtual int GetLastRandomizingTime() const;
   virtual int GetRandomNumber(int src) const;
   virtual int GetRandomNumberFromSet(int src) const;
+
+  // THO: CYCLIC RANDOM GENERATOR
+  virtual int GenerateCyclic(int n, vector<int>& src_avai) const;
 };
 
 #endif

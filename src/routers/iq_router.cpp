@@ -190,25 +190,24 @@ IQRouter::IQRouter( Configuration const & config, Module *parent,
     _unique_random_vect[i] = i;
   }
 
-  unsigned long num_random = 2;
+  unsigned long num_random = 3;
   _unique_random_set_vect.resize(gC);
   for (int i = 0; i < gC; i++){
     set<int> temp;
     temp.clear();
 
-    int j = 0;
     while(temp.size() < num_random){
-      // int rndm = RandomInt(gC - 1);
-      int port = 2 * (i / 2) + j;
-      // cout << "From: " << i << " to: " << port << endl;
-      temp.insert(port);
-      j += 1;
+      int rndm = RandomInt(gC - 1);
+      temp.insert(rndm);
     }
 
     _unique_random_set_vect[i] = temp;
 
   }
 
+  uplink_occupy.resize(4,0);
+  uplink_register.resize(4);
+  
 }
 
 IQRouter::~IQRouter( )
@@ -2606,4 +2605,28 @@ int IQRouter::GetRandomNumberFromSet(int src) const{
   }
 
   return rndm;
+}
+
+// THO: CYCLIC RANDOM GENERATOR
+// Function to generate n non-repeating random numbers
+int IQRouter::GenerateCyclic(int n, vector<int>& src_avai) const{
+     // Fill the vector
+    if (src_avai.empty()) {
+        for (int i = 0; i < n; i++)
+            src_avai.push_back(i);
+    }
+ 
+    int m = src_avai.size();
+ 
+    // Make sure the number is within the index range
+    int index = rand() % m;
+ 
+    // Get random number from the vector
+    int num = src_avai[index];
+ 
+    // Remove the number from the vector
+    swap(src_avai[index], src_avai[m - 1]);
+    src_avai.pop_back();
+
+    return num;
 }
