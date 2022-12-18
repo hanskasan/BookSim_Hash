@@ -3,6 +3,7 @@
 #include <limits>
 #include <sstream>
 #include <fstream>
+#include <math.h>
 
 #include "packet_reply_info.hpp"
 #include "random_utils.hpp"
@@ -12,7 +13,13 @@ FatMsgBatchRateTrafficManager::FatMsgBatchRateTrafficManager( const Configuratio
 					  const vector<Network *> & net )
 : MsgBatchRateTrafficManager(config, net)
 {
+  _fat_ratio = config.GetInt("fat_ratio");
   _physical_nodes = gNodes / _fat_ratio;
+
+  cout << "Number of physical nodes: " << _physical_nodes << endl;
+ 
+  // Adjust batch size to according to _fat_ratio
+  _batch_size = _fat_ratio * _batch_size;
 
   // Injection queues
   _qtime.resize(_physical_nodes);
@@ -41,15 +48,31 @@ FatMsgBatchRateTrafficManager::FatMsgBatchRateTrafficManager( const Configuratio
         }
     }
 
+  _reordering_vect_size.resize(_physical_nodes);
+
+    for (int i = 0; i < _physical_nodes; i++){
+        _reordering_vect_size[i].resize(_physical_nodes);
+        
+        for (int j = 0; j < _physical_nodes; j++){
+            _reordering_vect_size[i][j] = 0;
+        }
+    }
+
+  _reordering_vect_maxsize = 0;
+
   // HANS: Manual compute and memory node selection
   _compute_nodes.clear();
   _memory_nodes.clear();
-  
-  vector<int> temp_comp = {0, 1, 2};
-  vector<int> temp_mem  = {3};
 
-//   vector<int> temp_comp = {0, 1, 2, 3, 4, 5};
-//   vector<int> temp_mem  = {6, 7};
+  // vector<int> temp_comp = {0, 1, 2, 3};
+  // vector<int> temp_mem  = {};
+  
+  // HANS: No compute and memory node differentiation
+  vector<int> temp_comp;
+  for (int iter = 0; iter < _physical_nodes; iter++){
+    temp_comp.push_back(iter);
+  }
+  vector<int> temp_mem  = {};
 
   set<int> temp_set_comp(temp_comp.begin(), temp_comp.end());
   set<int> temp_set_mem (temp_mem.begin(),  temp_mem.end());
@@ -77,7 +100,18 @@ FatMsgBatchRateTrafficManager::FatMsgBatchRateTrafficManager( const Configuratio
   if(config.GetInt("injection_rate_uses_flits")) {
     for(int c = 0; c < _classes; ++c){
       _load[c] /= GetAverageMessageSize(c);
-      _load[c] *= _fat_ratio;
+      // _load[c] *= _fat_ratio;
+
+      // Calculation total intersection probability
+      double ini_prob = _load[c];
+      double intersection = 0.0;
+      for (int iter = 2; iter <= _fat_ratio; iter++){
+        intersection += pow(ini_prob, iter) * (double)(factorial(_fat_ratio)/(factorial(iter) * factorial(_fat_ratio - iter)));
+      }
+
+      _load[c] = _fat_ratio * ini_prob - intersection;
+
+      // cout << "Initial: " << ini_prob << ", Intersection: " << intersection << ", After: " << _load[c] << endl;
     }
   }
 
@@ -86,6 +120,7 @@ FatMsgBatchRateTrafficManager::FatMsgBatchRateTrafficManager( const Configuratio
   injection_process.resize(_classes, injection_process.back());
 
   for(int c = 0; c < _classes; ++c){
+    cout << "Register load: " << _load[c] << " for fat-node." << endl;
     _injection_process[c] = InjectionProcess::New(injection_process[c], _nodes, _load[c], &config);
   }
 
@@ -325,6 +360,15 @@ void FatMsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int 
                          << "." << endl;
           }
 
+          // HANS: For debugging
+          /*
+          if (f->head){
+          // if ((f->msg_head) && (f->head)){
+            if ((f->src / _fat_ratio) == 3)
+              cout << GetSimTime() << " - Enqueuing fID " << f->id << ", pID: " << f->pid << ", mID: " << f->mid << ", Src: " << f->src << ", Dest: " << f->dest << ", CTime: " << f->ctime << ", ITime: " << f->itime << ", OutPort: " << f->out_port << ". Enqueued at: " << time << endl;
+          }
+          */
+
           _partial_packets[f->src][cl].push_back( f );
       }
     }
@@ -338,11 +382,11 @@ void FatMsgBatchRateTrafficManager::_Inject(){
             // that is currently empty
 
             int empty_port;
-            bool is_empty = false;
+            bool is_empty = true;
             for ( int n = 0; n < _fat_ratio; ++n ){
-                if (_partial_packets[phy * _fat_ratio + n][c].empty()){
-                    empty_port = phy * _fat_ratio + n;
-                    is_empty = true;
+                if (!_partial_packets[phy * _fat_ratio + n][c].empty()){
+                    // empty_port = phy * _fat_ratio + n;
+                    is_empty = false;
                     break;
                 }
             }
@@ -353,6 +397,7 @@ void FatMsgBatchRateTrafficManager::_Inject(){
                     int stype = IssueMessage( phy, c );
 	  
                     if ( stype != 0 ) { //generate a packet
+                        empty_port = phy * _fat_ratio;
                         GenerateMessage( empty_port, stype, c, 
                                          _include_queuing==1 ? 
                                          _qtime[phy][c] : _time );
@@ -409,6 +454,19 @@ void FatMsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
   search->second.second.push(f);
 #endif
 
+  // HANS: Increment reordering buffer size count
+  _reordering_vect_size[physical_source][physical_dest] += 1;
+  assert(_reordering_vect_size[physical_source][physical_dest] >= 0);
+
+  int sum = 0;
+  for (int iter = 0; iter < _physical_nodes; iter++){
+    sum += _reordering_vect_size[iter][physical_dest];
+  }
+
+  if (sum > _reordering_vect_maxsize){
+    _reordering_vect_maxsize = sum;
+  }
+
 #ifdef PACKET_GRAN_ORDER
   while ((!_reordering_vect[physical_source][physical_dest][type]->q.empty()) && (_reordering_vect[physical_source][physical_dest][type]->q.top()->packet_seq == _reordering_vect[physical_source][physical_dest][type]->recv)){
     Flit* temp = _reordering_vect[physical_source][physical_dest][type]->q.top();
@@ -433,10 +491,14 @@ void FatMsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
     _last_pid = temp->pid;
 
     // HANS: For debugging
-    if (temp->tail){
-      if ((temp->dest / _fat_ratio) == 0)
-        cout << GetSimTime() << " - Retire flit " << temp->id << ", pID: " << temp->pid << ", mID: " << temp->mid << ", Src: " << temp->src << ", Dest: " << temp->dest << ", CTime: " << temp->ctime << ", ITime: " << temp->itime << ", RLat: " << GetSimTime() - temp->rtime << ", OutPort: " << temp->out_port << ". Retired at: " << temp->rtime << endl;
-    }
+    // if (temp->tail){
+      // if ((temp->dest / _fat_ratio) == 3)
+        // cout << GetSimTime() << " - Retire flit " << temp->id << ", pID: " << temp->pid << ", mID: " << temp->mid << ", Src: " << temp->src << ", Dest: " << temp->dest << ", CTime: " << temp->ctime << ", ITime: " << temp->itime << ", RLat: " << GetSimTime() - temp->rtime << ", OutPort: " << temp->out_port << ". Retired at: " << temp->rtime << endl;
+    // }
+
+    // HANS: Decrement reordering buffer size count
+    _reordering_vect_size[physical_source][physical_dest] -= 1;
+    assert(_reordering_vect_size[temp->src][dest] >= 0);
     
     OriRetireFlit(temp, dest);
 
@@ -501,16 +563,31 @@ void FatMsgBatchRateTrafficManager::OriRetireFlit( Flit *f, int dest )
         _pair_flat[f->cl][f->src*_nodes+dest]->AddSample( f->atime - f->itime );
     }
 
+    // HANS: Additionals for recordering endpoint waiting time
+    if (f->head){
+        if ((f->src / gC) != (f->dest / gC)){
+            _uplat_stats[f->cl]->AddSample( f->uptime );
+
+            // if ((f->src / gC) == 0)
+                // cout << GetSimTime() << "- Uptime: " << f->uptime << ", fID: " << f->id << endl;
+        }
+        _ewlat_stats[f->cl]->AddSample( f->ewtime );
+    }
+
     // HANS: Additionals for recording reordering latency
     // Packet latency does not include the reordering latency
     // if ( f->head ){
     if (f->tail){
 
-        if ((f->type == Flit::READ_REPLY) || (f->type == Flit::WRITE_REPLY)){ // Only record reply traffic 
-            // HANS: For debugging
-            // cout << "ID: " << f->id << ", Dest: " << f->dest << ", Rlat: " << GetSimTime() - f->rtime << endl;
+        if (_use_read_write[f->cl]){
+          if ((f->type == Flit::READ_REPLY) || (f->type == Flit::WRITE_REPLY)){ // Only record reply traffic 
+              // HANS: For debugging
+              // cout << "ID: " << f->id << ", Dest: " << f->dest << ", Rlat: " << GetSimTime() - f->rtime << endl;
 
-            _rlat_stats[f->cl]->AddSample( GetSimTime() - f->rtime );
+              _rlat_stats[f->cl]->AddSample( GetSimTime() - f->rtime );
+          }
+        } else {
+          _rlat_stats[f->cl]->AddSample( GetSimTime() - f->rtime );
         }
 
         if (f->type == Flit::READ_REPLY){
@@ -593,11 +670,16 @@ void FatMsgBatchRateTrafficManager::OriRetireFlit( Flit *f, int dest )
             _nlat_class[nlat_class_idx]++;
 
             // HANS: Additionals for request-reply traffic
-            if ((f->type == Flit::READ_REQUEST) || (f->type == Flit::READ_REPLY)){
-                _read_plat_stats[f->cl]->AddSample( f->atime - head->ctime);
-            } else {
-                assert((f->type == Flit::WRITE_REQUEST) || (f->type == Flit::WRITE_REPLY));
-                _write_plat_stats[f->cl]->AddSample( f->atime - head->ctime);
+            if (_use_read_write[f->cl]){
+              if ((f->type == Flit::READ_REQUEST) || (f->type == Flit::READ_REPLY)){
+                  _read_plat_stats[f->cl]->AddSample( f->atime - head->ctime );
+                  _read_nlat_stats[f->cl]->AddSample( f->atime - head->itime );
+              } else {
+                  assert((f->type == Flit::WRITE_REQUEST) || (f->type == Flit::WRITE_REPLY));
+                  _write_plat_stats[f->cl]->AddSample( f->atime - head->ctime );
+                  _write_nlat_stats[f->cl]->AddSample( f->atime - head->itime );
+
+              }
             }
 
         }
@@ -612,4 +694,11 @@ void FatMsgBatchRateTrafficManager::OriRetireFlit( Flit *f, int dest )
     } else {
         f->Free();
     }
+}
+
+int factorial(int n){
+  if ((n==0)||(n==1))
+    return 1;
+  else
+    return n*factorial(n-1);
 }

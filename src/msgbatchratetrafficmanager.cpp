@@ -109,22 +109,6 @@ MsgBatchRateTrafficManager::MsgBatchRateTrafficManager( const Configuration &con
                               _write_request_message_size[c] * _write_request_size[c] + _write_reply_message_size[c] * _write_reply_size[c]) / 2);
           // _message_size_rate[c] = vector<int>(1, 1);
           // _message_size_max_val[c] = 0;
-      } else {
-          int sizes;
-
-          vector<int> const & msize = _message_size[c];
-          sizes = msize.size();
-          assert(sizes == 1); // HANS: Just for now..
-          // if(sizes == 1) {
-          double message_size = (double)msize[0];
-
-          vector<int> const & psize = _packet_size[c];
-          sizes = psize.size();
-          assert(sizes == 1); // HANS: Just for now..
-
-          double packet_size = (double)psize[0];
-
-          _message_size[c] = vector<int>(1, (message_size * packet_size));
       }
   }
 
@@ -140,6 +124,7 @@ MsgBatchRateTrafficManager::MsgBatchRateTrafficManager( const Configuration &con
   injection_process.resize(_classes, injection_process.back());
 
   for(int c = 0; c < _classes; ++c){
+    cout << "Register load: " << _load[c] << endl;
     _injection_process[c] = InjectionProcess::New(injection_process[c], _nodes, _load[c], &config);
   }
 
@@ -160,6 +145,21 @@ MsgBatchRateTrafficManager::MsgBatchRateTrafficManager( const Configuration &con
     cout << *i << " ";
   }
   cout << endl;
+
+  // HANS: TEST
+  // unsigned long fibonacci_mult = 11400714819323198485; // (2 ^ (64)) / 1.61803398875, 64 is the word size
+
+  // int key, out_port;
+  // for (int src_iter = 0; src_iter < 16; src_iter++){
+  //   for (int dest_iter = 0; dest_iter < 16; dest_iter++){
+  //     key = src_iter * (gK * gC) + dest_iter;
+  //     out_port = ((unsigned long)(key * fibonacci_mult) >> 62);
+
+  //     // cout << "Source: " << src_iter << ", Dest: " << dest_iter << ", OutPort: " << out_port << endl;
+  //     cout << out_port << endl;
+  //   }
+  // }
+
 }
 
 MsgBatchRateTrafficManager::~MsgBatchRateTrafficManager( )
@@ -204,6 +204,14 @@ void MsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
   search->second.second.push(f);
 #endif
 
+  // HANS: Increment reordering buffer size count
+  _reordering_vect_size[f->src][dest] += 1;
+  assert(_reordering_vect_size[f->src][dest] >= 0);
+
+  if (_reordering_vect_size[f->src][dest] > _reordering_vect_maxsize){
+    _reordering_vect_maxsize = _reordering_vect_size[f->src][dest];
+  }
+
 #ifdef PACKET_GRAN_ORDER
   while ((!_reordering_vect[f->src][dest][type]->q.empty()) && (_reordering_vect[f->src][dest][type]->q.top()->packet_seq <= _reordering_vect[f->src][dest][type]->recv)){
     Flit* temp = _reordering_vect[f->src][dest][type]->q.top();
@@ -230,8 +238,12 @@ void MsgBatchRateTrafficManager::_RetireFlit( Flit *f, int dest )
     // HANS: For debugging
     // if (temp->tail){
     //   if (temp->dest == 0)
-    //     cout << GetSimTime() << " - Retire flit " << temp->id << ", pID: " << temp->pid << ", mID: " << temp->mid << ", Head: " << temp->head << ", Tail: " << temp->tail << ", Type: " << temp->type << ", RLat: " << GetSimTime() - temp->rtime << " from " << temp->src << ", OutPort: " << temp->out_port << ". Retired at: " << temp->rtime << endl;
+    //     cout << GetSimTime() << " - Retire flit " << temp->id << ", pID: " << temp->pid << ", mID: " << temp->mid << ", Head: " << temp->head << ", Tail: " << temp->tail << ", Source: " << f->src << ", Type: " << temp->type << ", RLat: " << GetSimTime() - temp->rtime << " from " << temp->src << ", OutPort: " << temp->out_port << ", Injected at: " << temp->itime << ". Retired at: " << temp->rtime << endl;
     // }
+
+    // HANS: Decrement reordering buffer size count
+    _reordering_vect_size[temp->src][dest] -= 1;
+    assert(_reordering_vect_size[temp->src][dest] >= 0);
 
     TrafficManager::_RetireFlit(temp, dest);
 
@@ -306,6 +318,10 @@ void MsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl,
     Flit::FlitType message_type = Flit::ANY_TYPE;
     int message_size = GetNextMessageSize(cl); //in packets
     int packet_size = _GetNextPacketSize(cl); //in flits
+
+    // if (source == 0)
+      // cout << "Message size: " << message_size << endl;
+
     int message_destination = _traffic_pattern[cl]->dest(source);
     bool record = false;
     // bool watch = gWatchOut && (_packets_to_watch.count(pid) > 0); // HANS: Disabled for now
@@ -433,14 +449,16 @@ void MsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl,
           if (f->pid == pkt_watch_id) f->watch = true;
           */
 
-          // int flit_watch_id = 1700;
-          // int flit_watch_id_2 = -1;
-          // if ((f->id == flit_watch_id) || (f->id == flit_watch_id_2)) f->watch = true;
+          int flit_watch_id = -1;
+          int flit_watch_id_2 = -1;
+          if ((f->id == flit_watch_id) || (f->id == flit_watch_id_2)) f->watch = true;
 
           switch( _pri_type ) {
           case class_based:
               f->pri = _class_priority[cl];
               assert(f->pri >= 0);
+
+              
               break;
           case age_based:
               f->pri = numeric_limits<int>::max() - time;
@@ -486,7 +504,7 @@ void MsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl,
           }
 
           // HANS: For debugging
-          // if (source == 12)
+          // if (source == 0)
             // cout << GetSimTime() << " - Generate flit at source: " << f->src << ", fID: " << f->id << ", pID: " << f->pid << ", mID: " << f->mid << " | Packet_Head: " << f->head << ", Packet_Tail: " << f->tail << ", Msg_Head: " << f->msg_head << ", Msg_Tail: " << f->msg_tail << " | Type: " << f->type << " | Prio: " << f->pri << endl;
 
           _partial_packets[source][cl].push_back( f );
@@ -685,20 +703,19 @@ double MsgBatchRateTrafficManager::GetAverageMessageSize(int cl) const
     vector<int> const & msize = _message_size[cl];
     sizes = msize.size();
     assert(sizes == 1); // HANS: Just for now..
-    // if(sizes == 1) {
     double message_size = (double)msize[0];
-    // }
-    
-    // vector<int> const & psize = _packet_size[cl];
-    // sizes = psize.size();
-    // assert(sizes == 1); // HANS: Just for now..
 
-    // if(sizes == 1) {
-    // double packet_size = (double)psize[0];
-    // }
+    if (_use_read_write[cl]){
+      return message_size;
+    } else {
+      vector<int> const & psize = _packet_size[cl];
+      sizes = psize.size();
+      assert(sizes == 1); // HANS: Just for now..
 
-    // return message_size * packet_size;
-    return message_size;
+      double packet_size = (double)psize[0];
+
+      return message_size * packet_size;
+    }
 
     /*
     vector<int> const & prate = _packet_size_rate[cl];

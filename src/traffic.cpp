@@ -93,10 +93,20 @@ TrafficPattern * TrafficPattern::New(string const & pattern, int nodes,
     result = new RandomPermutationTrafficPattern(nodes, perm_seed);
   } else if(pattern_name == "uniform") {
     result = new UniformRandomTrafficPattern(nodes);
+  } else if(pattern_name == "uniform_fat") {
+    int fat_ratio = config->GetInt("fat_ratio");
+    result = new UniformRandomFatTrafficPattern(nodes, fat_ratio);
   } else if(pattern_name == "uniform_sel") {
     result = new UniformRandomSelectiveTrafficPattern(nodes);
+  } else if(pattern_name == "uniform_interrouter") {
+    result = new UniformRandomInterRouterTrafficPattern(nodes);
   } else if(pattern_name == "modulo_worst") {
     result = new ModuloWorstTrafficPattern(nodes);
+  } else if(pattern_name == "endpoint") {
+    result = new EndpointTrafficPattern(nodes);
+  } else if(pattern_name == "endpoint_fat") {
+    int fat_ratio = config->GetInt("fat_ratio");
+    result = new EndpointFatTrafficPattern(nodes, fat_ratio);
   } else if(pattern_name == "background") {
     vector<int> excludes = tokenize_int(params[0]);
     result = new UniformBackgroundTrafficPattern(nodes, excludes);
@@ -453,6 +463,29 @@ int UniformRandomTrafficPattern::dest(int source)
   return RandomInt(_nodes - 1);
 }
 
+UniformRandomFatTrafficPattern::UniformRandomFatTrafficPattern(int nodes, int fat_ratio)
+  : RandomTrafficPattern(nodes)
+{
+  _physical_nodes = _nodes / fat_ratio;
+}
+
+int UniformRandomFatTrafficPattern::dest(int source)
+{
+  assert((source >= 0) && (source < _physical_nodes));
+
+  /*
+  int random = source;
+
+  while (random == source){
+    random = RandomInt(_physical_nodes - 1);
+  }
+
+  return random;
+  */
+
+ return RandomInt(_physical_nodes - 1);
+}
+
 UniformRandomSelectiveTrafficPattern::UniformRandomSelectiveTrafficPattern(int nodes)
   : RandomTrafficPattern(nodes)
 {
@@ -480,6 +513,24 @@ int UniformRandomSelectiveTrafficPattern::dest(int source)
   return *temp;
 }
 
+UniformRandomInterRouterTrafficPattern::UniformRandomInterRouterTrafficPattern(int nodes)
+  : RandomTrafficPattern(nodes)
+{
+}
+
+int UniformRandomInterRouterTrafficPattern::dest(int source)
+{
+  assert((source >= 0) && (source < _nodes));
+  
+  int dest = source;
+
+  while ((dest / gC) == (source / gC)){
+    dest = RandomInt(_nodes - 1);
+  }
+
+  return dest;
+}
+
 ModuloWorstTrafficPattern::ModuloWorstTrafficPattern(int nodes)
   : RandomTrafficPattern(nodes)
 {
@@ -498,6 +549,43 @@ int ModuloWorstTrafficPattern::dest(int source)
   // while(_active_nodes.count(dest) != 0) {
   //   dest = (dest_router + RandomInt(gK - 1)) % _nodes;
   // }
+  return dest;
+}
+
+EndpointTrafficPattern::EndpointTrafficPattern(int nodes)
+  : RandomTrafficPattern(nodes)
+{
+}
+
+int EndpointTrafficPattern::dest(int source)
+{
+  assert((source >= 0) && (source < _nodes));
+
+  int dest_router = 0;
+
+  int dest = ((dest_router * gK) + RandomInt(gK - 1)) % _nodes;
+  // int dest = ((dest_router * gK) + (source % gK)) % _nodes;
+
+  // cout << "Source: " << source << ", Dest: " << dest << endl;
+
+  return dest;
+}
+
+EndpointFatTrafficPattern::EndpointFatTrafficPattern(int nodes, int fat_ratio)
+  : RandomTrafficPattern(nodes)
+{
+  _fat_ratio = fat_ratio;
+  _physical_nodes = nodes / fat_ratio;
+}
+
+int EndpointFatTrafficPattern::dest(int source)
+{
+  assert((source >= 0) && (source < _physical_nodes));
+
+  int dest_router = 0;
+  // int dest = ((dest_router * _fat_ratio) + RandomInt(_fat_ratio - 1)) % _nodes;
+  int dest = ((dest_router * _fat_ratio) + (source % (gC / _fat_ratio))) % _nodes;
+
   return dest;
 }
 

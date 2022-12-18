@@ -57,8 +57,8 @@ protected:
 
   virtual string _OverallStatsCSV(int c = 0) const;
 
-  int GetNextMessageSize(int cl) const;
-  double GetAverageMessageSize(int cl) const;
+  virtual int GetNextMessageSize(int cl) const;
+  virtual double GetAverageMessageSize(int cl) const;
 
 public:
 

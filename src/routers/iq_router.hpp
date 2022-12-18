@@ -111,6 +111,8 @@ class IQRouter : public Router {
   vector<queue<int> > _util_vect;
   vector<int> _injected_packets_vect;
 
+  mutable vector<int> _hash_func;
+
   // HANS: For non-repeating random number
   mutable int _last_randomizing_time;
   mutable vector<int> _unique_random_vect;
@@ -157,6 +159,11 @@ class IQRouter : public Router {
 
   SwitchMonitor * _switchMonitor ;
   BufferMonitor * _bufferMonitor ;
+
+  // HANS: Additional information for hashing
+  vector<vector<int> > _contributors_to_dest;
+
+  void RegisterContributorsToDest(int input_port, int dest_router);
   
 public:
 
@@ -201,6 +208,12 @@ public:
   virtual int GetLastRandomizingTime() const;
   virtual int GetRandomNumber(int src) const;
   virtual int GetRandomNumberFromSet(int src) const;
+
+  // HANS: Additional information for hashing
+  virtual int GetContributorsToDest(int dest_router) const;
+
+  virtual int GetHashed(int input) const;
+  virtual void ModifyHashFunc(int input, int new_val) const;
 };
 
 #endif

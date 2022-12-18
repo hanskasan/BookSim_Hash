@@ -189,6 +189,7 @@ IQRouter::IQRouter( Configuration const & config, Module *parent,
   for (int i = 0; i < gC; i++){
     _unique_random_vect[i] = i;
   }
+  RandomizeHash();
 
   unsigned long num_random = 2;
   _unique_random_set_vect.resize(gC);
@@ -209,6 +210,17 @@ IQRouter::IQRouter( Configuration const & config, Module *parent,
 
   }
 
+  int num_of_routers = gNodes / gC;
+  _contributors_to_dest.resize(num_of_routers);
+  for (int r= 0; r < num_of_routers; r++){
+    _contributors_to_dest[r].resize(gC);
+
+    for (int c = 0; c < gC; c++){
+      _contributors_to_dest[r][c] = -1;
+    }
+  }
+
+  _hash_func.resize(gK, 0);
 }
 
 IQRouter::~IQRouter( )
@@ -661,10 +673,15 @@ void IQRouter::_RouteUpdate( )
     // NOTE: No need to handle NOQ here, as it requires lookahead routing!
     _route_vcs.pop_front();
 
+    // if (input < gC){
+      // RegisterContributorsToDest(input, f->dest / gC);
+    // }
+
     // HANS: Additionals
     if (input < gC){
       _injected_packets_vect[input] += 1;
     }
+
   }
 }
 
@@ -775,7 +792,7 @@ void IQRouter::_VCAllocEvaluate( )
 		       << " at input " << use_input;
 	    Flit * cf = _buf[use_input]->FrontFlit(use_vc);
 	    if(cf) {
-	      *gWatchOut << " (front flit: " << cf->id << ")";
+	      *gWatchOut << " (front flit: " << cf->id << ", front packet: " << cf->pid << ")";
 	    } else {
 	      *gWatchOut << " (empty)";
 	    }
@@ -1034,6 +1051,11 @@ void IQRouter::_VCAllocUpdate( )
         int temp = f->uptime;
         assert(temp >= 0);
         f->uptime = GetSimTime() - temp;
+
+        // HANS: For debugging
+        // if (((f->src / gC) == 0) && (f->uptime > 0)){
+        //   cout << GetSimTime() << " - fID: " << f->id << ", OutPort: " << match_output << ", Uptime: " << f->uptime << endl;
+        // }
       }
 
     } else {
@@ -2119,6 +2141,9 @@ void IQRouter::_SWAllocUpdate( )
         int temp = f->ewtime;
         assert(temp >= 0);
         f->ewtime = GetSimTime() - temp;
+
+        // if (f->watch)
+          // cout << "Flit ID: " << f->id << ", Wait: " << f->ewtime << endl;
       }
 
 #ifdef TRACK_FLOWS
@@ -2560,6 +2585,10 @@ void IQRouter::_UpdateNOQ(int input, int vc, Flit const * f) {
 
 // HANS: Additional
 int IQRouter::GetChanUtil(int output){
+  if (output >= _outputs){
+    cout << "Output error: " << output << " at router " << this->GetID() << endl;
+  }
+
   assert((output >= 0) && (output < _outputs));
 
   int window = 100;
@@ -2583,7 +2612,7 @@ void IQRouter::RandomizeHash() const{
     _unique_random_vect[shuffle_with] = temp;
   }
 
-  _last_randomizing_time = GetSimTime() + 10;
+  // _last_randomizing_time = GetSimTime();
 }
 
 int IQRouter::GetLastRandomizingTime() const{
@@ -2606,4 +2635,32 @@ int IQRouter::GetRandomNumberFromSet(int src) const{
   }
 
   return rndm;
+}
+
+void IQRouter::RegisterContributorsToDest(int input_port, int dest_router){
+  assert((dest_router >= 0) && (dest_router < (gNodes / gC)));
+
+  _contributors_to_dest[dest_router][input_port] = GetSimTime();
+}
+
+int IQRouter::GetContributorsToDest(int dest_router) const{
+  const int VALID_TIME = 100;
+
+  int count = 0;
+  for (int p = 0; p < gC; p++){
+    if ((_contributors_to_dest[dest_router][p] > 0) && (_contributors_to_dest[dest_router][p] + VALID_TIME >= GetSimTime()))
+      count += 1;
+  }
+
+  return count;
+}
+
+int IQRouter::GetHashed(int input) const{
+  assert((input >= 0) && (input < gK));
+
+  return _hash_func[input];
+}
+
+void IQRouter::ModifyHashFunc(int input, int new_val) const{
+  _hash_func[input] = new_val;
 }

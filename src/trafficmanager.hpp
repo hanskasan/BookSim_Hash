@@ -200,6 +200,11 @@ protected:
   vector<double> _overall_avg_rlat;  
   vector<double> _overall_max_rlat;
 
+  // vector<Stats *> _rcount_stats;     
+  // vector<double> _overall_min_rcount;  
+  // vector<double> _overall_avg_rcount;  
+  // vector<double> _overall_max_rcount;
+
   // HANS: Request-reply latency statistics
   vector<Stats *> _read_plat_stats;     
   vector<double> _overall_min_read_plat;  
@@ -210,6 +215,16 @@ protected:
   vector<double> _overall_min_write_plat;  
   vector<double> _overall_avg_write_plat;  
   vector<double> _overall_max_write_plat;
+
+  vector<Stats *> _read_nlat_stats;     
+  vector<double> _overall_min_read_nlat;  
+  vector<double> _overall_avg_read_nlat;  
+  vector<double> _overall_max_read_nlat;
+
+  vector<Stats *> _write_nlat_stats;     
+  vector<double> _overall_min_write_nlat;  
+  vector<double> _overall_avg_write_nlat;  
+  vector<double> _overall_max_write_nlat;
 
   vector<Stats *> _read_rlat_stats;     
   vector<double> _overall_min_read_rlat;  
@@ -282,6 +297,8 @@ protected:
   // HANS: Additionals for reordering
   int _flit_types = 2;
   vector<vector<vector<ReorderInfo*> > > _reordering_vect;
+  vector<vector<int> > _reordering_vect_size;
+  int _reordering_vect_maxsize;
 
   // ============ Simulation parameters ============ 
 
@@ -347,14 +364,16 @@ protected:
   int _num_memory_nodes;
 
   // Record latency distribution
-  static const int _resolution = 50;
-  static const int _num_cell = 61;
+  static const int _resolution = 1;
+  static const int _num_cell = 100;
 
   static const int _resolution_rlat = 5; // 5
   static const int _num_cell_rlat = 120; // 50
 
   int _plat_class[_num_cell] = {0};
   int _nlat_class[_num_cell] = {0};
+  int _read_plat_class[_num_cell] = {0};
+  int _write_plat_class[_num_cell] = {0};
   int _rlat_class[_num_cell_rlat] = {0};
 
   // ============ Internal methods ============ 
@@ -437,7 +456,26 @@ public:
     cout << endl;
     cout << "*** NETWORK LATENCY DISTRIBUTION ***" << endl;
     for (int iter_cell = 0; iter_cell < _num_cell; iter_cell++){
-      cout << iter_cell * _resolution << "\t" << _nlat_class[iter_cell] << endl;
+      // cout << iter_cell * _resolution << "\t" << _nlat_class[iter_cell] << endl;
+      cout << _nlat_class[iter_cell] << endl;
+    }
+    cout << "*** END ***" << endl;
+    cout << endl;
+  }
+
+  void PrintRWPlatDistribution() const {
+    cout << endl;
+    cout << "*** READ PACKET LATENCY DISTRIBUTION ***" << endl;
+    for (int iter_cell = 0; iter_cell < _num_cell; iter_cell++){
+      cout << iter_cell * _resolution << "\t" << _read_plat_class[iter_cell] << endl;
+    }
+    cout << "*** END ***" << endl;
+    cout << endl;
+
+    cout << endl;
+    cout << "*** WRITE PACKET LATENCY DISTRIBUTION ***" << endl;
+    for (int iter_cell = 0; iter_cell < _num_cell; iter_cell++){
+      cout << iter_cell * _resolution << "\t" << _write_plat_class[iter_cell] << endl;
     }
     cout << "*** END ***" << endl;
     cout << endl;

@@ -93,6 +93,9 @@ void Flit::Reset()
 
   // HANS: Additionals for reordering
   out_port = -1;
+
+  // HANS: Additionals for message size
+  is_large = false;
 }  
 
 Flit * Flit::New() {
