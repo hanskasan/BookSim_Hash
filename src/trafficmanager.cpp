@@ -499,6 +499,16 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     _overall_avg_write_plat.resize(_classes, 0.0);
     _overall_max_write_plat.resize(_classes, 0.0);
 
+    _read_nlat_stats.resize(_classes);
+    _overall_min_read_nlat.resize(_classes, 0.0);
+    _overall_avg_read_nlat.resize(_classes, 0.0);
+    _overall_max_read_nlat.resize(_classes, 0.0);
+
+    _write_nlat_stats.resize(_classes);
+    _overall_min_write_nlat.resize(_classes, 0.0);
+    _overall_avg_write_nlat.resize(_classes, 0.0);
+    _overall_max_write_nlat.resize(_classes, 0.0);
+
     _rlat_stats.resize(_classes);
     _overall_min_rlat.resize(_classes, 0.0);
     _overall_avg_rlat.resize(_classes, 0.0);
@@ -513,6 +523,11 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     _overall_min_write_rlat.resize(_classes, 0.0);
     _overall_avg_write_rlat.resize(_classes, 0.0);
     _overall_max_write_rlat.resize(_classes, 0.0);
+
+    // _rcount_stats.resize(_classes);
+    // _overall_min_rcount.resize(_classes, 0.0);
+    // _overall_avg_rcount.resize(_classes, 0.0);
+    // _overall_max_rcount.resize(_classes, 0.0);
 
     _uplat_stats.resize(_classes);
     _overall_min_uplat.resize(_classes, 0.0);
@@ -600,7 +615,7 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
         _stats[tmp_name.str()] = _hop_stats[c];
         tmp_name.str("");
 
-        // HANS: Additionals for reordering latency
+        // HANS: Additionals for read-write traffic
         tmp_name << "read_plat_stat_" << c;
         _read_plat_stats[c] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
         _stats[tmp_name.str()] = _read_plat_stats[c];
@@ -611,6 +626,17 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
         _stats[tmp_name.str()] = _write_plat_stats[c];
         tmp_name.str("");
 
+        tmp_name << "read_nlat_stat_" << c;
+        _read_nlat_stats[c] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
+        _stats[tmp_name.str()] = _read_nlat_stats[c];
+        tmp_name.str("");
+
+        tmp_name << "write_nlat_stat_" << c;
+        _write_nlat_stats[c] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
+        _stats[tmp_name.str()] = _write_nlat_stats[c];
+        tmp_name.str("");
+
+        // HANS: Additionals for reordering latency
         tmp_name << "rlat_stat_" << c;
         _rlat_stats[c] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
         _stats[tmp_name.str()] = _rlat_stats[c];
@@ -625,6 +651,11 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
         _write_rlat_stats[c] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
         _stats[tmp_name.str()] = _write_rlat_stats[c];
         tmp_name.str("");
+
+        // tmp_name << "rcount_stat_" << c;
+        // _rcount_stats[c] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
+        // _stats[tmp_name.str()] = _rcount_stats[c];
+        // tmp_name.str("");
 
         tmp_name << "uplat_stat_" << c;
         _uplat_stats[c] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
@@ -714,10 +745,23 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
         }
     }
 
+    _reordering_vect_size.resize(_nodes);
+
+    for (int i = 0; i < _nodes; i++){
+        _reordering_vect_size[i].resize(_nodes);
+        
+        for (int j = 0; j < _nodes; j++){
+            _reordering_vect_size[i][j] = 0;
+        }
+    }
+
+    _reordering_vect_maxsize = 0;
+
     _slowest_flit.resize(_classes, -1);
     _slowest_packet.resize(_classes, -1);
 
     // HANS: Active node configuration
+    /*
     _num_active_concentration = config.GetInt("active_concentration");
     if (_num_active_concentration <= 0)  _num_active_concentration = gC;
 
@@ -766,6 +810,17 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     }
     */
 
+    // HANS: Manual compute and memory node selection
+    // 1. Clustered
+    // vector<int> temp_comp;
+    // for (int iter = 0; iter < 12; iter++){
+    //     temp_comp.push_back(iter);
+    // }
+
+    // vector<int> temp_mem  = {};
+    // for (int iter = 12; iter < 16; iter++){
+    //     temp_mem.push_back(iter);
+    // }
 
     // THO: Use parameters to choose node
     vector<int> temp_comp;
@@ -776,6 +831,11 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
 
     // for (int m = 0; m < _num_memory_nodes; m++)
     //     temp_mem.push_back(_nodes - m);
+    // vector<int> temp_comp = {0, 1, 2, 3};
+    // vector<int> temp_mem  = {4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+
+    // vector<int> temp_comp = {4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+    // vector<int> temp_mem  = {0, 1, 2, 3};
 
     // 2. Interleaved
     assert(_num_memory_nodes % gK == 0);    // Tho: For now, only support mem at every router for evaluation fairness
@@ -790,9 +850,16 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
         temp_mem.push_back(memory_node);
         memory_node = (memory_node < gK) ? memory_node + (_nodes - gK - 1) : memory_node - gK;
     }
+    // vector<int> temp_comp = {0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14};
+    // vector<int> temp_mem  = {3, 7, 11, 15};
 
-    assert((temp_comp.size() + temp_mem.size()) == _nodes); // Assertion of nodes selection
-    // Finish choosing nodes ---
+    // vector<int> temp_comp = {1, 2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14};
+    // vector<int> temp_mem  = {0, 5, 10, 15};
+
+    // 3. No compute-memory
+    // vector<int> temp_comp = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+    // vector<int> temp_mem  = {};
+
 
     set<int> temp_set_comp(temp_comp.begin(), temp_comp.end());
     set<int> temp_set_mem (temp_mem.begin(),  temp_mem.end());
@@ -820,9 +887,12 @@ TrafficManager::~TrafficManager( )
         // HANS: Additionals for reordering latency
         delete _read_plat_stats[c];
         delete _write_plat_stats[c];
+        delete _read_nlat_stats[c];
+        delete _write_nlat_stats[c];
         delete _rlat_stats[c];
         delete _read_rlat_stats[c];
         delete _write_rlat_stats[c];
+        // delete _rcount_stats[c];
         delete _uplat_stats[c];
         delete _ewlat_stats[c];
 
@@ -947,6 +1017,12 @@ void TrafficManager::_RetireFlit( Flit *f, int dest )
                 _write_rlat_stats[f->cl]->AddSample( GetSimTime() - f->rtime );
             }
         } else {
+            if (f->is_large){
+                _read_rlat_stats[f->cl]->AddSample( GetSimTime() - f->rtime );
+            } else {
+                _write_rlat_stats[f->cl]->AddSample( GetSimTime() - f->rtime );
+            }
+
             _rlat_stats[f->cl]->AddSample( GetSimTime() - f->rtime );
 
             // HANS: Additionals for recording "reordering" latency distribution
@@ -1012,7 +1088,7 @@ void TrafficManager::_RetireFlit( Flit *f, int dest )
             _plat_stats[f->cl]->AddSample( f->atime - head->ctime);
             _nlat_stats[f->cl]->AddSample( f->atime - head->itime);
             _frag_stats[f->cl]->AddSample( (f->atime - head->atime) - (f->id - head->id) );
-   
+
             if(_pair_stats){
                 _pair_plat[f->cl][f->src*_nodes+dest]->AddSample( f->atime - head->ctime );
                 _pair_nlat[f->cl][f->src*_nodes+dest]->AddSample( f->atime - head->itime );
@@ -1027,13 +1103,29 @@ void TrafficManager::_RetireFlit( Flit *f, int dest )
 
             int nlat_class_idx = (f->atime - head->itime) / _resolution;
             if (nlat_class_idx > (_num_cell - 1))   nlat_class_idx = _num_cell - 1;
-            _nlat_class[nlat_class_idx]++;
+            // _nlat_class[nlat_class_idx]++;
+
+            if (((f->src / gC) == 0) && ((f->dest / gC) == 1)){
+                _nlat_class[nlat_class_idx]++;
+            }
 
             // HANS: Additionals for request-reply traffic
             if ((f->type == Flit::READ_REQUEST) || (f->type == Flit::READ_REPLY)){
                 _read_plat_stats[f->cl]->AddSample( f->atime - head->ctime);
+                _read_nlat_stats[f->cl]->AddSample( f->atime - head->itime);
             } else if ((f->type == Flit::WRITE_REQUEST) || (f->type == Flit::WRITE_REPLY)) {
                 _write_plat_stats[f->cl]->AddSample( f->atime - head->ctime);
+                _write_nlat_stats[f->cl]->AddSample( f->atime - head->itime);
+            }
+
+            if (f->type == Flit::READ_REPLY){
+                int read_plat_class_idx = (f->atime - head->ctime) / _resolution;
+                if (read_plat_class_idx > (_num_cell - 1))   read_plat_class_idx = _num_cell - 1;
+                _read_plat_class[read_plat_class_idx]++;
+            } else if (f->type == Flit::WRITE_REPLY){
+                int write_plat_class_idx = (f->atime - head->ctime) / _resolution;
+                if (write_plat_class_idx > (_num_cell - 1))   write_plat_class_idx = _num_cell - 1;
+                _write_plat_class[write_plat_class_idx]++;
             }
 
         }
@@ -1194,7 +1286,7 @@ void TrafficManager::_GeneratePacket( int source, int stype,
         // int pkt_watch_id = 187;
         // if (f->pid == pkt_watch_id) f->watch = true;
 
-        // int flit_watch_id = 1;
+        // int flit_watch_id = 5870;
         // if (f->id == flit_watch_id) f->watch = true;
 
         switch( _pri_type ) {
@@ -1590,7 +1682,7 @@ void TrafficManager::_Step( )
         _net[subnet]->WriteOutputs( );
 
         // HANS: Additionals
-        if (GetSimTime() > 100){
+        if ((GetSimTime() > 100) && (gN == 2)){
             // Uplink
             for (int i = 0; i < 4; i++){
                 for (int j = 0; j < 4; j++){
@@ -1662,9 +1754,12 @@ void TrafficManager::_ClearStats( )
         // HANS: Additionals for reordering latency
         _read_plat_stats[c]->Clear();
         _write_plat_stats[c]->Clear();
+        _read_nlat_stats[c]->Clear();
+        _write_nlat_stats[c]->Clear();
         _rlat_stats[c]->Clear();
         _read_rlat_stats[c]->Clear();
         _write_rlat_stats[c]->Clear();
+        // _rcount_stats[c]->Clear();
         _uplat_stats[c]->Clear();
         _ewlat_stats[c]->Clear();
 
@@ -2087,9 +2182,21 @@ void TrafficManager::_UpdateOverallStats() {
         _overall_avg_write_plat[c] += _write_plat_stats[c]->Average();
         _overall_max_write_plat[c] += _write_plat_stats[c]->Max();
 
+        _overall_min_read_nlat[c] += _read_nlat_stats[c]->Min();
+        _overall_avg_read_nlat[c] += _read_nlat_stats[c]->Average();
+        _overall_max_read_nlat[c] += _read_nlat_stats[c]->Max();
+
+        _overall_min_write_nlat[c] += _write_nlat_stats[c]->Min();
+        _overall_avg_write_nlat[c] += _write_nlat_stats[c]->Average();
+        _overall_max_write_nlat[c] += _write_nlat_stats[c]->Max();
+
         _overall_min_rlat[c] += _rlat_stats[c]->Min();
         _overall_avg_rlat[c] += _rlat_stats[c]->Average();
         _overall_max_rlat[c] += _rlat_stats[c]->Max();
+
+        // _overall_min_rcount[c] += _rcount_stats[c]->Min();
+        // _overall_avg_rcount[c] += _rcount_stats[c]->Average();
+        // _overall_max_rcount[c] += _rcount_stats[c]->Max();
 
         _overall_min_read_rlat[c] += _read_rlat_stats[c]->Min();
         _overall_avg_read_rlat[c] += _read_rlat_stats[c]->Average();
@@ -2403,7 +2510,15 @@ void TrafficManager::DisplayStats(ostream & os) const {
 
             << "Write packet latency average = " << _write_plat_stats[c]->Average() << endl
             << "\tminimum = " << _write_plat_stats[c]->Min() << endl
-            << "\tmaximum = " << _write_plat_stats[c]->Max() << endl;
+            << "\tmaximum = " << _write_plat_stats[c]->Max() << endl
+
+            << "Read network latency average = " << _read_nlat_stats[c]->Average() << endl
+            << "\tminimum = " << _read_nlat_stats[c]->Min() << endl
+            << "\tmaximum = " << _read_nlat_stats[c]->Max() << endl
+
+            << "Write network latency average = " << _write_nlat_stats[c]->Average() << endl
+            << "\tminimum = " << _write_nlat_stats[c]->Min() << endl
+            << "\tmaximum = " << _write_nlat_stats[c]->Max() << endl;
         }
 
         cout
@@ -2421,6 +2536,11 @@ void TrafficManager::DisplayStats(ostream & os) const {
             << "\tminimum = " << _write_rlat_stats[c]->Min() << endl
             << "\tmaximum = " << _write_rlat_stats[c]->Max() << endl;
         }
+
+        // cout
+        //     << "Reordering count average = " << _rcount_stats[c]->Average() << endl
+        //     << "\tminimum = " << _rcount_stats[c]->Min() << endl
+        //     << "\tmaximum = " << _rcount_stats[c]->Max() << endl;
 
         cout
             << "Uplink contention time average = " << _uplat_stats[c]->Average() << endl
@@ -2573,12 +2693,35 @@ void TrafficManager::DisplayOverallStats( ostream & os ) const {
         os << "\tmaximum = " << _overall_max_write_plat[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
 
+        os << "Read network latency average = " << _overall_avg_read_nlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_read_nlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_read_nlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
+        os << "Write network latency average = " << _overall_avg_write_nlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tminimum = " << _overall_min_write_nlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+        os << "\tmaximum = " << _overall_max_write_nlat[c] / (double)_total_sims
+           << " (" << _total_sims << " samples)" << endl;
+
         os << "Reordering latency average = " << _overall_avg_rlat[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
         os << "\tminimum = " << _overall_min_rlat[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
-        os << "\tmaximum = " << _overall_max_rlat[c] / (double)_total_sims
+        os << "\tReordering maximum = " << _overall_max_rlat[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
+
+        os << "Max reordering count = " << _reordering_vect_maxsize << endl;
+
+        // os << "Reordering count average = " << _overall_avg_rcount[c] / (double)_total_sims
+        //    << " (" << _total_sims << " samples)" << endl;
+        // os << "\tminimum = " << _overall_min_rcount[c] / (double)_total_sims
+        //    << " (" << _total_sims << " samples)" << endl;
+        // os << "\tReordering count maximum = " << _overall_max_rcount[c] / (double)_total_sims
+        //    << " (" << _total_sims << " samples)" << endl;
         
         os << "Read reordering latency average = " << _overall_avg_read_rlat[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
@@ -2592,7 +2735,7 @@ void TrafficManager::DisplayOverallStats( ostream & os ) const {
         os << "\tminimum = " << _overall_min_write_rlat[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
         os << "\tmaximum = " << _overall_max_write_rlat[c] / (double)_total_sims
-           << " (" << _total_sims << " samples)" << endl;
+           << " (" << _total_sims << " samples)" << endl;        
 
         os << "Uplink waiting latency average = " << _overall_avg_uplat[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
@@ -2647,8 +2790,9 @@ void TrafficManager::DisplayOverallStats( ostream & os ) const {
 
         // HANS: Additionals
         // PrintPlatDistribution();
-        // PrintNlatDistribution();
+        PrintNlatDistribution();
         // PrintRlatDistribution();
+        // PrintRWPlatDistribution();
     
 #ifdef TRACK_STALLS
         os << "Buffer busy stall rate = " << (double)_overall_buffer_busy_stalls[c] / (double)_total_sims

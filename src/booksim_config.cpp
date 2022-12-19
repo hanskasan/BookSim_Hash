@@ -78,6 +78,9 @@ BookSimConfig::BookSimConfig( )
   _int_map["fail_seed"]     = 0; //legacy
   AddStrField( "fail_seed", "" ); // workaround to allow special "time" value
 
+  // HANS: Additional configuration for fat-node simulations
+  _int_map["fat_ratio"] = 1;
+
   //==== Single-node options ===============================
 
   _int_map["in_ports"]  = 5;
@@ -197,6 +200,11 @@ BookSimConfig::BookSimConfig( )
   // if multiple values are specified per class, set probabilities for each
   _int_map["message_size_rate"] = 1;
   AddStrField("message_size_rate", ""); // workaraound to allow for vector specification
+
+  // Configuration for mixed message size
+  _int_map["big_message_size"]    = 1;
+  _int_map["small_message_size"]  = 1;
+  _float_map["big_message_ratio"] = 0.5;
 
   // HANS: Additional configurations for simulations using fat-node
   _int_map["is_fat_node"] = 0;

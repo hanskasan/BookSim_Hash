@@ -125,10 +125,24 @@ public:
   virtual int dest(int source);
 };
 
+class UniformRandomFatTrafficPattern : public RandomTrafficPattern {
+public:
+  UniformRandomFatTrafficPattern(int nodes, int fat_ratio);
+  virtual int dest(int source);
+private:
+  int _physical_nodes;
+};
+
 // HANS: Additional
 class UniformRandomSelectiveTrafficPattern : public RandomTrafficPattern {
 public:
   UniformRandomSelectiveTrafficPattern(int nodes);
+  virtual int dest(int source);
+};
+
+class UniformRandomInterRouterTrafficPattern : public RandomTrafficPattern {
+public:
+  UniformRandomInterRouterTrafficPattern(int nodes);
   virtual int dest(int source);
 };
 
@@ -188,6 +202,20 @@ class ModuloWorstTrafficPattern : public RandomTrafficPattern {
 public:
   ModuloWorstTrafficPattern(int nodes);
   virtual int dest(int source);
+};
+class EndpointTrafficPattern : public RandomTrafficPattern {
+public:
+  EndpointTrafficPattern(int nodes);
+  virtual int dest(int source);
+};
+
+class EndpointFatTrafficPattern : public RandomTrafficPattern {
+public:
+  EndpointFatTrafficPattern(int nodes, int fat_ratio);
+  virtual int dest(int source);
+private:
+  int _fat_ratio;
+  int _physical_nodes;
 };
 
 class UniformBackgroundTrafficPattern : public RandomTrafficPattern {

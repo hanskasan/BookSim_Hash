@@ -230,6 +230,12 @@ public:
   virtual int GetRandomNumber(int src) const { return -1; }
   virtual int GetRandomNumberFromSet(int src) const { return -1; }
 
+  // HANS: Additional information for hashing
+  virtual int GetContributorsToDest(int dest_router) const { return 0; };
+
+  virtual int GetHashed(int input) const { return 0; };
+  virtual void ModifyHashFunc(int input, int new_val) const {};
+
   // THO: CYCLIC RANDOM GENERATOR
   virtual int GenerateCyclic(int n, vector<int>& src_avai) const {return -1;}
 

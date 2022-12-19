@@ -96,6 +96,9 @@ public:
   // HANS: Additionals for reordering
   uint packet_seq;
 
+  // HANS: Additionals for message size
+  bool is_large;
+
   mutable int out_port;
 
   void Reset();
