@@ -55,8 +55,11 @@ BookSimConfig::BookSimConfig( )
   AddStrField( "routing_function", "none" );
 
   _int_map["active_concentration"] = -1; // per router
-  _int_map["compute_nodes"] = 8; // per router
-  _int_map["memory_nodes"] = 8; // per router
+  _int_map["compute_nodes"] = 8;
+  _int_map["memory_nodes"] = 8;
+
+  _int_map["rand_hotspot_src"] = 0;
+  _int_map["rand_hotspot_dst"] = 0;
 
   //simulator tries to correclty adjust latency for node/router placement 
   _int_map["use_noc_latency"] = 1;

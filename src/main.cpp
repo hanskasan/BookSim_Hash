@@ -97,6 +97,12 @@ ostream * gWatchOut;
 set<int> _compute_nodes;
 set<int> _memory_nodes;
 
+// THO: Hotspot sets
+set<int> _hs_dests;
+set<int> _hs_srcs;
+bool _hs_send_all;
+
+
 /////////////////////////////////////////////////////////////////////////////
 
 bool Simulate( BookSimConfig const & config )

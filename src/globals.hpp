@@ -60,4 +60,9 @@ extern std::ostream * gWatchOut;
 extern std::set<int> _compute_nodes;
 extern std::set<int> _memory_nodes;
 
+// THO: Hotspot related
+extern std::set<int> _hs_dests;
+extern std::set<int> _hs_srcs;
+extern bool _hs_send_all;
+
 #endif
