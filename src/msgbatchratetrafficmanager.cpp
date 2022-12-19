@@ -282,7 +282,8 @@ int MsgBatchRateTrafficManager::IssueMessage( int source, int cl )
 	      result = -1;
       }
     } else {
-      if (_compute_nodes.count(source) > 0){
+      // THO: Active and hotspot
+      if ((_compute_nodes.count(source) > 0) && !_hs_dests.count(source)) {
       // if (1){
         if((_injection_process[cl]->test(source)) && (_message_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
 	        //coin toss to determine request type.
@@ -296,7 +297,8 @@ int MsgBatchRateTrafficManager::IssueMessage( int source, int cl )
       }
     }
   } else { //normal
-    if (_compute_nodes.count(source) > 0){
+    // THO: Active and hotspot
+    if ((_compute_nodes.count(source) > 0) && !_hs_dests.count(source)) {
     // if (1){
       if((_injection_process[cl]->test(source)) && (_message_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
         result = GetNextMessageSize(cl);
@@ -566,7 +568,8 @@ bool MsgBatchRateTrafficManager::_SingleSim( )
       batch_complete = true;
       for(int i = 0; i < _nodes; ++i) {
       // HANS: Additionals
-        if (_compute_nodes.count(i) > 0){
+        // THO: Active and hotspot
+        if ((_compute_nodes.count(i) > 0) && !_hs_dests.count(i)) {
         // if (1){  
           if (_message_seq_no[i] < _batch_size) {
 	          batch_complete = false;

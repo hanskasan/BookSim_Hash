@@ -498,7 +498,29 @@ int UniformRandomSelectiveTrafficPattern::dest(int source)
   //   temp++;
   // }
 
+  // return rand_dest;
+  // HANS: Select destination only from _memory_nodes
+  // int rand = RandomInt(_memory_nodes.size() - 1);
+  // set<int>::iterator temp = _memory_nodes.begin();
+  // for (int iter = 0; iter < rand; iter++){
+  //   temp++;
+  // }
   // return *temp;
+}
+
+UniformRandomInterRouterTrafficPattern::UniformRandomInterRouterTrafficPattern(int nodes)
+  : RandomTrafficPattern(nodes)
+{
+}
+int UniformRandomInterRouterTrafficPattern::dest(int source)
+{
+  assert((source >= 0) && (source < _nodes));
+  
+  int dest = source;
+  while ((dest / gC) == (source / gC)){
+    dest = RandomInt(_nodes - 1);
+  }
+  return dest;
 }
 
 // THO: Select destination using _active_nodes (AD)
@@ -776,54 +798,6 @@ int EndpointFatTrafficPattern::dest(int source)
   return dest;
 }
 
-// THO: Hotspot traffic (Evaluate separately Hotspot vs. background)
-UniformRandomHotspotTrafficPattern::UniformRandomHotspotTrafficPattern(int nodes)
-  : RandomTrafficPattern(nodes)
-{
-}
-
-int UniformRandomHotspotTrafficPattern::dest(int source)
-{
-  assert((source >= 0) && (source < _nodes));
-  
-  int rand_dest = RandomInt(_nodes-1);
-  // Background (not send to hs_dest)
-  if (!_hs_send_all && _hs_srcs.count(source)==0) {
-    assert(0);
-    while(_hs_dests.count(rand_dest) != 0) {
-      rand_dest = RandomInt(_nodes-1);
-    }
-  }
-  // Hotspot (send to hs_dest)
-  else {
-    while(_hs_dests.count(rand_dest) == 0) {
-      rand_dest = RandomInt(_nodes-1);
-    }
-  }
-
-  // cout << "[HOTSPOT] Source: " << source << ", Destination: " << rand_dest << endl;
-
-  return rand_dest;
-}
-
-// THO: Hotspot traffic (Evaluate traffics altogether)
-UniformRandomBackgroundTrafficPattern::UniformRandomBackgroundTrafficPattern(int nodes)
-  : RandomTrafficPattern(nodes)
-{
-}
-
-int UniformRandomBackgroundTrafficPattern::dest(int source)
-{
-  assert((source >= 0) && (source < _nodes));
-  
-  int rand_dest = RandomInt(_nodes-1);
-  while(_hs_dests.count(rand_dest) != 0 || _hs_srcs.count(rand_dest) != 0) {
-    rand_dest = RandomInt(_nodes-1);
-  }
-
-  // cout << "[BACKGROUND] Source: " << source << ", Destination: " << rand_dest << endl;
-  return rand_dest;
-}
 
 UniformBackgroundTrafficPattern::UniformBackgroundTrafficPattern(int nodes, vector<int> excluded_nodes)
   : RandomTrafficPattern(nodes)

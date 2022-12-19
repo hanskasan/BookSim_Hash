@@ -132,6 +132,14 @@ public:
   mutable vector<int>              pattern;
   // inline int RouterRandom(int k) const {return RandomInt(k);}
 
+  // THO: Spreading
+  mutable vector<set<int> >     uplink_spread_dest;
+  mutable vector<vector<int> >  uplink_spread_list;
+  mutable vector<int>           spread_degree;
+  mutable vector<int>           spread_pid;
+  mutable int                   packet_cnt;   // Is there any information about message?
+  mutable vector<bool>          switch_flag;
+  
   // HANS: Additionals for hashing
   inline void IncrementRROffset( int max ) const { 
     _roundrobin = (_roundrobin + 1) % max;

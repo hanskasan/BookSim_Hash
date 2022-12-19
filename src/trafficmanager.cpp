@@ -822,7 +822,68 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     //     temp_mem.push_back(iter);
     // }
 
+    bool _hs_send_all = false;
+
+    // THO: Hotspot initializing
+    for (int c = 0; c < _classes; ++c) {
+        // This traffic is to choose hotspot randomly
+        _hs_srcs.clear();
+        _hs_dests.clear();
+        if (_traffic[c] == "rand_hotspot")
+        {
+            int rand_hotspot_src = config.GetInt("rand_hotspot_src");
+            int rand_hotspot_dst = config.GetInt("rand_hotspot_dst");
+            cout << "Random hotspot, generating " << rand_hotspot_src << " destinations and " << rand_hotspot_dst << " sources" << endl;
+            // Assign hotspot sources
+            cout << "Hotspot Src: ";
+            while (_hs_srcs.size() < rand_hotspot_src) {
+                _hs_srcs.insert(RandomInt(_nodes - 1));
+            }
+            for(set<int>::iterator i = _hs_srcs.begin(); i != _hs_srcs.end(); i++) {
+                cout << *i << " ";
+            }
+            cout << endl;
+            // Assign hotspot destinations
+            cout << "Hotspot Dest: ";
+            while (_hs_dests.size() < rand_hotspot_dst) {
+                int rand_dest = RandomInt(_nodes-1);
+                if(_hs_srcs.count(rand_dest)==0) {
+                    _hs_dests.insert(rand_dest);
+                }
+            }
+            for(set<int>::iterator i = _hs_dests.begin(); i != _hs_dests.end(); i++) {
+                cout << *i << " ";
+            }
+            cout << endl;
+        }
+        // This traffic is to choose hotspot manually
+        else if (_traffic[c] == "sel_hotspot")
+        {
+            // Assign hotspot sources
+            cout << "Manually selected hotspot" << endl;
+            vector<int> hotspot_senders = config.GetIntArray("hotspot_senders");
+            if (hotspot_senders.empty()) {
+                _hs_send_all = true;
+                cout << "All are hotspot sources" << endl;
+            } else {
+                cout << "Hotspot sources are = ";
+                for(size_t i = 0; i < hotspot_senders.size(); i++) {
+                    _hs_srcs.insert(hotspot_senders[i]);
+                    cout << hotspot_senders[i] << " ";
+                }
+            }
+            vector<int> hotspot_receivers = config.GetIntArray("hotspot_receivers");
+            cout << "Hotspot destinations are = ";
+            for(size_t i = 0; i < hotspot_receivers.size(); i++) {
+                _hs_dests.insert(hotspot_receivers[i]);
+                cout << hotspot_receivers[i] << " ";
+            }
+        }
+        assert((_hs_dests.size() + _hs_srcs.size()) <= _nodes);
+    }
     // THO: Use parameters to choose node
+    _num_compute_nodes = config.GetInt("compute_nodes");
+    _num_memory_nodes = config.GetInt("memory_nodes");
     vector<int> temp_comp;
     vector<int> temp_mem;
     // 1. Clustered or No compute-memory
@@ -865,6 +926,7 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     set<int> temp_set_mem (temp_mem.begin(),  temp_mem.end());
     _compute_nodes = temp_set_comp;
     _memory_nodes  = temp_set_mem;
+    cout << "Compute: " << _compute_nodes.size() << ", memory: " << _memory_nodes.size() << endl; 
     assert((_compute_nodes.size() + _memory_nodes.size()) == _nodes);
 }
 
@@ -2790,7 +2852,7 @@ void TrafficManager::DisplayOverallStats( ostream & os ) const {
 
         // HANS: Additionals
         // PrintPlatDistribution();
-        PrintNlatDistribution();
+        // PrintNlatDistribution();
         // PrintRlatDistribution();
         // PrintRWPlatDistribution();
     

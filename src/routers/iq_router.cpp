@@ -217,8 +217,13 @@ IQRouter::IQRouter( Configuration const & config, Module *parent,
   }
 
   _hash_func.resize(gK, 0);
-  uplink_occupy.resize(4,0);
-  uplink_register.resize(4);
+  uplink_occupy.resize(gK,0);
+  uplink_register.resize(gK);
+  uplink_spread_dest.resize(gC);
+  uplink_spread_list.resize(gC);
+  spread_degree.resize(gC);
+  spread_pid.resize(gC, 0);
+  switch_flag.resize(gC, false);
   
 }
 

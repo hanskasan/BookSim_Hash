@@ -81,7 +81,8 @@ int BatchTrafficManager::_IssuePacket( int source, int cl )
       }
     } else {
       // HANS
-      if (_compute_nodes.count(source) > 0){
+      // THO: Active and hotspot
+      if ((_compute_nodes.count(source) > 0) && !_hs_dests.count(source)) {
         if((_packet_seq_no[source] < _batch_size) && ((_max_outstanding <= 0) || (_requestsOutstanding[source] < _max_outstanding))) {
         
 	        //coin toss to determine request type.
@@ -92,7 +93,8 @@ int BatchTrafficManager::_IssuePacket( int source, int cl )
       }
     }
   } else { //normal
-    if (_compute_nodes.count(source) > 0){
+    // THO: Active and hotspot
+    if ((_compute_nodes.count(source) > 0) && !_hs_dests.count(source)) {
         if((_packet_seq_no[source] < _batch_size) && 
            ((_max_outstanding <= 0) || 
 	    (_requestsOutstanding[source] < _max_outstanding))) {
@@ -134,7 +136,8 @@ bool BatchTrafficManager::_SingleSim( )
       batch_complete = true;
       for(int i = 0; i < _nodes; ++i) {
       // HANS: Additionals
-        if (_compute_nodes.count(i) > 0){
+        // THO: Active and hotspot
+        if ((_compute_nodes.count(i) > 0) && !_hs_dests.count(i)) {
           if (_packet_seq_no[i] < _batch_size) {
 	          batch_complete = false;
 	          break;
@@ -142,7 +145,7 @@ bool BatchTrafficManager::_SingleSim( )
 	      }
       }
       if(_sent_packets_out) {
-	*_sent_packets_out << _packet_seq_no << endl;
+	      *_sent_packets_out << _packet_seq_no << endl;
       }
     } while(!batch_complete);
     cout << "Batch injected. Time used is " << _time - start_time << " cycles." << endl;
