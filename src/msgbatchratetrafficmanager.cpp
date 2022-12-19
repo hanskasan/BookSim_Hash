@@ -314,15 +314,14 @@ int MsgBatchRateTrafficManager::IssueMessage( int source, int cl )
 void MsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int cl, int time )
 {
     assert(stype!=0);
+    int message_destination;
 
     Flit::FlitType message_type = Flit::ANY_TYPE;
     int message_size = GetNextMessageSize(cl); //in packets
     int packet_size = _GetNextPacketSize(cl); //in flits
-
-    // if (source == 0)
-      // cout << "Message size: " << message_size << endl;
-
-    int message_destination = _traffic_pattern[cl]->dest(source);
+    // THO: workaround glitch in compute-memory traffic
+    if (stype > 0)
+      message_destination = _traffic_pattern[cl]->dest(source);
     bool record = false;
     // bool watch = gWatchOut && (_packets_to_watch.count(pid) > 0); // HANS: Disabled for now
     bool watch = false;
@@ -699,24 +698,19 @@ int MsgBatchRateTrafficManager::GetNextMessageSize(int cl) const
 double MsgBatchRateTrafficManager::GetAverageMessageSize(int cl) const
 {
     int sizes;
-
     vector<int> const & msize = _message_size[cl];
     sizes = msize.size();
     assert(sizes == 1); // HANS: Just for now..
     double message_size = (double)msize[0];
-
     if (_use_read_write[cl]){
       return message_size;
     } else {
       vector<int> const & psize = _packet_size[cl];
       sizes = psize.size();
       assert(sizes == 1); // HANS: Just for now..
-
       double packet_size = (double)psize[0];
-
       return message_size * packet_size;
     }
-
     /*
     vector<int> const & prate = _packet_size_rate[cl];
     int sum = 0;

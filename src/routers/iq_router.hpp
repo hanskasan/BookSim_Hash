@@ -214,6 +214,9 @@ public:
 
   virtual int GetHashed(int input) const;
   virtual void ModifyHashFunc(int input, int new_val) const;
+
+  // THO: CYCLIC RANDOM GENERATOR
+  virtual int GenerateCyclic(int n, vector<int>& src_avai) const;
 };
 
 #endif

@@ -123,6 +123,15 @@ public:
 
   inline int GetID( ) const {return _id;}
 
+  // Tho: Hash supporting variables
+  mutable int inc_hash;
+  mutable int ran_hash;
+  mutable vector<bool> uplink_occupy;
+  mutable vector<pair<int, bool> > uplink_register;
+  mutable vector<int>              src_avai;
+  mutable vector<int>              pattern;
+  // inline int RouterRandom(int k) const {return RandomInt(k);}
+
   // HANS: Additionals for hashing
   inline void IncrementRROffset( int max ) const { 
     _roundrobin = (_roundrobin + 1) % max;
@@ -226,6 +235,9 @@ public:
 
   virtual int GetHashed(int input) const { return 0; };
   virtual void ModifyHashFunc(int input, int new_val) const {};
+
+  // THO: CYCLIC RANDOM GENERATOR
+  virtual int GenerateCyclic(int n, vector<int>& src_avai) const {return -1;}
 
 };
 

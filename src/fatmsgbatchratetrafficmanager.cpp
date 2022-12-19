@@ -173,11 +173,14 @@ void FatMsgBatchRateTrafficManager::GenerateMessage( int source, int stype, int 
     int physical_source = source / _fat_ratio;
     assert((physical_source >= 0) && (physical_source < _physical_nodes));
     assert(stype!=0);
+    int message_destination;
 
     Flit::FlitType message_type = Flit::ANY_TYPE;
     int message_size = GetNextMessageSize(cl); //in packets
     int packet_size = _GetNextPacketSize(cl); //in flits
-    int message_destination = _traffic_pattern[cl]->dest(physical_source);
+    // THO: workaround glitch in compute-memory traffic
+    if (stype > 0)
+      message_destination = _traffic_pattern[cl]->dest(physical_source);
     bool record = false;
     // bool watch = gWatchOut && (_packets_to_watch.count(pid) > 0); // HANS: Disabled for now
     bool watch = false;
