@@ -39,6 +39,7 @@
 #include <map>
 #include <cstdlib>
 #include <cassert>
+#include <math.h>
 
 #include "booksim.hpp"
 #include "routefunc.hpp"
@@ -300,11 +301,11 @@ void fattree_nca( const Router *r, const Flit *f,
 
       //ejection
       if(router_depth == gN-1){
-	out_port = dest%gK;
+        out_port = dest%gK;
       } else {	
-	//find the down port for the destination
-	int router_branch_coverage = powi(gK, gN-(router_depth+1)); 
-	out_port = (dest-router_neighborhood* router_coverage)/router_branch_coverage;
+        //find the down port for the destination
+        int router_branch_coverage = powi(gK, gN-(router_depth+1)); 
+        out_port = (dest-router_neighborhood* router_coverage)/router_branch_coverage;
       }
     } else {
       //up ports are numbered last
@@ -361,11 +362,11 @@ void fattree_nca_sourcehash( const Router *r, const Flit *f,
 
       //ejection
       if(router_depth == gN-1){
-	out_port = dest%gK;
+        out_port = dest%gK;
       } else {	
-	//find the down port for the destination
-	int router_branch_coverage = powi(gK, gN-(router_depth+1)); 
-	out_port = (dest-router_neighborhood* router_coverage)/router_branch_coverage;
+        //find the down port for the destination
+        int router_branch_coverage = powi(gK, gN-(router_depth+1)); 
+        out_port = (dest-router_neighborhood* router_coverage)/router_branch_coverage;
       }
     } else {
       //up ports are numbered last
@@ -664,8 +665,8 @@ void fattree_nca_roundrobin( const Router *r, const Flit *f,
       out_port = gK + r->GetRROffset();
       r->IncrementRROffset(gK);
 
-      if ((f->src / gC) == 0){
-        cout << GetSimTime() << " - Node: " << f->src << ", Output: " << out_port << ", fID: " << f->id << endl;
+      if (f->src == 1) {
+        cout << GetSimTime() << " - Source: " << f->src << ", out_port: " << out_port << endl;
       }
     }
   }  
@@ -673,6 +674,172 @@ void fattree_nca_roundrobin( const Router *r, const Flit *f,
 
   outputs->AddRange( out_port, vcBegin, vcEnd );
 }
+
+
+void fattree_nca_rrrr( const Router *r, const Flit *f,
+               int in_channel, OutputSet* outputs, bool inject)
+{
+  int vcBegin = 0, vcEnd = gNumVCs-1;
+  if ( f->type == Flit::READ_REQUEST ) {
+    vcBegin = gReadReqBeginVC;
+    vcEnd = gReadReqEndVC;
+  } else if ( f->type == Flit::WRITE_REQUEST ) {
+    vcBegin = gWriteReqBeginVC;
+    vcEnd = gWriteReqEndVC;
+  } else if ( f->type ==  Flit::READ_REPLY ) {
+    vcBegin = gReadReplyBeginVC;
+    vcEnd = gReadReplyEndVC;
+  } else if ( f->type ==  Flit::WRITE_REPLY ) {
+    vcBegin = gWriteReplyBeginVC;
+    vcEnd = gWriteReplyEndVC;
+  }
+  assert(((f->vc >= vcBegin) && (f->vc <= vcEnd)) || (inject && (f->vc < 0)));
+
+  int out_port;
+
+  if(inject) {
+
+    out_port = -1;
+
+  } else {
+    
+    int dest = f->dest;
+    int router_id = r->GetID(); //routers are numbered with smallest at the top level
+    int routers_per_level = powi(gK, gN-1);
+    int pos = router_id%routers_per_level;
+    int router_depth  = router_id/ routers_per_level; //which level
+    int routers_per_neighborhood = powi(gK,gN-router_depth-1);
+    int router_neighborhood = pos/routers_per_neighborhood; //coverage of this tree
+    int router_coverage = powi(gK, gN-router_depth);  //span of the tree from this router
+    
+
+    //NCA reached going down
+    if(dest <(router_neighborhood+1)* router_coverage && 
+       dest >=router_neighborhood* router_coverage){
+      //down ports are numbered first
+
+      //ejection
+      if(router_depth == gN-1){
+	      out_port = dest%gK;
+      } else {	
+	      //find the down port for the destination
+	      int router_branch_coverage = powi(gK, gN-(router_depth+1)); 
+	      out_port = (dest-router_neighborhood* router_coverage)/router_branch_coverage;
+      }
+    } else {
+      //up ports are numbered last
+      assert(in_channel<gK);//came from a up channel
+
+      out_port = gK + ((r->ran_hash + r->inc_hash) % gK);
+
+      r->inc_hash++;
+      if (r->inc_hash % gK)
+        r->ran_hash++;
+
+      // if (f->src == 1) {
+      //   cout << GetSimTime() << " - Source: " << f->src << ", out_port: " << out_port << endl;
+      // }
+    }
+  }  
+  outputs->Clear( );
+
+  outputs->AddRange( out_port, vcBegin, vcEnd );
+}
+
+
+void fattree_nca_roundrobin_adaptive( const Router *r, const Flit *f,
+               int in_channel, OutputSet* outputs, bool inject)
+{
+  int vcBegin = 0, vcEnd = gNumVCs-1;
+  if ( f->type == Flit::READ_REQUEST ) {
+    vcBegin = gReadReqBeginVC;
+    vcEnd = gReadReqEndVC;
+  } else if ( f->type == Flit::WRITE_REQUEST ) {
+    vcBegin = gWriteReqBeginVC;
+    vcEnd = gWriteReqEndVC;
+  } else if ( f->type ==  Flit::READ_REPLY ) {
+    vcBegin = gReadReplyBeginVC;
+    vcEnd = gReadReplyEndVC;
+  } else if ( f->type ==  Flit::WRITE_REPLY ) {
+    vcBegin = gWriteReplyBeginVC;
+    vcEnd = gWriteReplyEndVC;
+  }
+  assert(((f->vc >= vcBegin) && (f->vc <= vcEnd)) || (inject && (f->vc < 0)));
+
+  int out_port;
+
+  if(inject) {
+
+    out_port = -1;
+
+  } else {
+    
+    int dest = f->dest;
+    int router_id = r->GetID(); //routers are numbered with smallest at the top level
+    int routers_per_level = powi(gK, gN-1);
+    int pos = router_id%routers_per_level;
+    int router_depth  = router_id/ routers_per_level; //which level
+    int routers_per_neighborhood = powi(gK,gN-router_depth-1);
+    int router_neighborhood = pos/routers_per_neighborhood; //coverage of this tree
+    int router_coverage = powi(gK, gN-router_depth);  //span of the tree from this router
+    
+
+    //NCA reached going down
+    if(dest <(router_neighborhood+1)* router_coverage && 
+       dest >=router_neighborhood* router_coverage){
+      //down ports are numbered first
+
+      //ejection
+      if(router_depth == gN-1){
+	      out_port = dest%gK;
+      } else {	
+	      //find the down port for the destination
+	      int router_branch_coverage = powi(gK, gN-(router_depth+1)); 
+	      out_port = (dest-router_neighborhood* router_coverage)/router_branch_coverage;
+      }
+    } else {
+      //up ports are numbered last
+      assert(in_channel<gK); //came from a up channel
+
+      r->ran_hash = 0;
+      for (int i = 0; i < gK; i++) {
+        if (r->IsVCFull(gK + i, vcBegin)) {
+          r->ran_hash = 1;
+          break;
+        }
+      }
+
+      // out_port = gK + ((r->ran_hash * (f->src % gK) + f->src) % gK);
+
+
+      r->inc_hash++;
+      out_port = gK + ((f->src + (r->inc_hash / gK)) % gK);
+      // out_port = gK + (f->src % gK);
+      // out_port = gK + ((r->ran_hash * (f->src / gK) + f->src + (r->inc_hash / gK)) % gK);
+      // out_port = gK + ((f->src + r->ran_hash * (r->inc_hash / gK)) % gK);
+      // if(r->IsVCFull(out_port, vcBegin)) {
+        // out_port = gK + ((r->ran_hash * (f->src / gK) + f->src) % gK);
+        // out_port = gK + (((f->src / gK) + f->src) % gK);
+        // out_port = gK + (((f->src / gK) + f->src + (r->inc_hash / 16)) % gK);
+      // }
+
+
+
+      // if(!r->IsVCFull(out_port, vcBegin))
+      //   out_port = gK + (f->src % gK);
+      // else
+      //   out_port = gK + (((f->src % gK) + f->src) % gK);
+
+      // if (f->src == 1) {
+      //   cout << GetSimTime() << " - Source: " << f->src << ", out_port: " << out_port << endl;
+      // }
+    }
+  }  
+  outputs->Clear( );
+
+  outputs->AddRange( out_port, vcBegin, vcEnd );
+}
+
 
 void fattree_nca_fibonaccihash( const Router *r, const Flit *f,
                int in_channel, OutputSet* outputs, bool inject)
@@ -1175,7 +1342,17 @@ void fattree_nca_pattern( const Router *r, const Flit *f,
       //   r->pattern.push_back(i);
       // if a channel if full, use a different pattern
       // or change every N cycles
-      if ((r->ran_hash == 32) || (r->ran_hash == 0)) {
+      // if ((r->ran_hash == 32) || (r->ran_hash == 0)) {
+      //   r->pattern.clear();
+      //   r->ran_hash = 1;
+      //   for (int j = 0; j < gK; j++) {
+      //     r->pattern.push_back(r->GenerateCyclic(gK, r->src_avai));
+      //   }
+      // }
+      // else
+      //   r->ran_hash++;
+
+      if (r->ran_hash == 0) {
         r->pattern.clear();
         r->ran_hash = 1;
         for (int j = 0; j < gK; j++) {
@@ -1184,7 +1361,10 @@ void fattree_nca_pattern( const Router *r, const Flit *f,
       }
       else
         r->ran_hash++;
+        
       r->inc_hash = (r->inc_hash + 1) % gK;
+      if ((r->ran_hash % 32) == 0)
+        r->inc_hash = (r->inc_hash + 1) % gK;
       out_port = gK + r->pattern[r->inc_hash];
     }
   }  
@@ -1238,11 +1418,11 @@ void fattree_nca_halfhash( const Router *r, const Flit *f,
 
       //ejection
       if(router_depth == gN-1){
-	out_port = dest%gK;
+        out_port = dest%gK;
       } else {	
-	//find the down port for the destination
-	int router_branch_coverage = powi(gK, gN-(router_depth+1)); 
-	out_port = (dest-router_neighborhood* router_coverage)/router_branch_coverage;
+        //find the down port for the destination
+        int router_branch_coverage = powi(gK, gN-(router_depth+1)); 
+        out_port = (dest-router_neighborhood* router_coverage)/router_branch_coverage;
       }
     } else {
       //up ports are numbered last
@@ -1652,11 +1832,11 @@ void fattree_anca( const Router *r, const Flit *f,
 
       //ejection
       if(router_depth == gN-1){
-	out_port = dest%gK;
+        out_port = dest%gK;
       } else {	
-	//find the down port for the destination
-	int router_branch_coverage = powi(gK, gN-(router_depth+1)); 
-	out_port = (dest-router_neighborhood* router_coverage)/router_branch_coverage;
+        //find the down port for the destination
+        int router_branch_coverage = powi(gK, gN-(router_depth+1)); 
+        out_port = (dest-router_neighborhood* router_coverage)/router_branch_coverage;
       }
     } else {
       //up ports are numbered last
@@ -1665,9 +1845,9 @@ void fattree_anca( const Router *r, const Flit *f,
       int random1 = RandomInt(gK-1); // Chose two ports out of the possible at random, compare loads, choose one.
       int random2 = RandomInt(gK-1);
       if (r->GetUsedCredit(out_port + random1) > r->GetUsedCredit(out_port + random2)){
-	out_port = out_port + random2;
+        out_port = out_port + random2;
       }else{
-	out_port =  out_port + random1;
+        out_port =  out_port + random1;
       }
     }
   }  
@@ -1675,6 +1855,509 @@ void fattree_anca( const Router *r, const Flit *f,
   
   outputs->AddRange( out_port, vcBegin, vcEnd );
 }
+
+
+
+void fattree_anca_source( const Router *r, const Flit *f,
+                int in_channel, OutputSet* outputs, bool inject)
+{
+
+  int vcBegin = 0, vcEnd = gNumVCs-1;
+  if ( f->type == Flit::READ_REQUEST ) {
+    vcBegin = gReadReqBeginVC;
+    vcEnd = gReadReqEndVC;
+  } else if ( f->type == Flit::WRITE_REQUEST ) {
+    vcBegin = gWriteReqBeginVC;
+    vcEnd = gWriteReqEndVC;
+  } else if ( f->type ==  Flit::READ_REPLY ) {
+    vcBegin = gReadReplyBeginVC;
+    vcEnd = gReadReplyEndVC;
+  } else if ( f->type ==  Flit::WRITE_REPLY ) {
+    vcBegin = gWriteReplyBeginVC;
+    vcEnd = gWriteReplyEndVC;
+  }
+  assert(((f->vc >= vcBegin) && (f->vc <= vcEnd)) || (inject && (f->vc < 0)));
+
+
+  int out_port;
+
+  if(inject) {
+
+    out_port = -1;
+
+  } else {
+
+
+    int dest = f->dest;
+    int router_id = r->GetID(); //routers are numbered with smallest at the top level
+    int routers_per_level = powi(gK, gN-1);
+    int pos = router_id%routers_per_level;
+    int router_depth  = router_id/ routers_per_level; //which level
+    int routers_per_neighborhood = powi(gK,gN-router_depth-1);
+    int router_neighborhood = pos/routers_per_neighborhood; //coverage of this tree
+    int router_coverage = powi(gK, gN-router_depth);  //span of the tree from this router
+    
+
+    //NCA reached going down
+    if(dest <(router_neighborhood+1)* router_coverage && 
+       dest >=router_neighborhood* router_coverage){
+      //down ports are numbered first
+
+      //ejection
+      if(router_depth == gN-1){
+        out_port = dest%gK;
+      } else {	
+        //find the down port for the destination
+        int router_branch_coverage = powi(gK, gN-(router_depth+1)); 
+        out_port = (dest-router_neighborhood* router_coverage)/router_branch_coverage;
+      }
+    } else {
+      //up ports are numbered last
+      assert(in_channel<gK);//came from a up channel
+      out_port = gK;
+      int port1 = gK + f->src % gK;
+      int port2 = gK + ((f->src / gK) + (f->src % gK)) % gK;
+      if (r->GetUsedCredit(port1) > r->GetUsedCredit(port2)){
+        out_port = port2;
+      }else{
+        out_port =  port1;
+      }
+    }
+  }  
+  outputs->Clear( );
+  
+  outputs->AddRange( out_port, vcBegin, vcEnd );
+}
+
+
+void fattree_nca_hybrid( const Router *r, const Flit *f,
+                int in_channel, OutputSet* outputs, bool inject)
+{
+
+  int vcBegin = 0, vcEnd = gNumVCs-1;
+  if ( f->type == Flit::READ_REQUEST ) {
+    vcBegin = gReadReqBeginVC;
+    vcEnd = gReadReqEndVC;
+  } else if ( f->type == Flit::WRITE_REQUEST ) {
+    vcBegin = gWriteReqBeginVC;
+    vcEnd = gWriteReqEndVC;
+  } else if ( f->type ==  Flit::READ_REPLY ) {
+    vcBegin = gReadReplyBeginVC;
+    vcEnd = gReadReplyEndVC;
+  } else if ( f->type ==  Flit::WRITE_REPLY ) {
+    vcBegin = gWriteReplyBeginVC;
+    vcEnd = gWriteReplyEndVC;
+  }
+  assert(((f->vc >= vcBegin) && (f->vc <= vcEnd)) || (inject && (f->vc < 0)));
+
+
+  int out_port;
+
+  if(inject) {
+
+    out_port = -1;
+
+  } else {
+
+
+    int dest = f->dest;
+    int router_id = r->GetID(); //routers are numbered with smallest at the top level
+    int routers_per_level = powi(gK, gN-1);
+    int pos = router_id%routers_per_level;
+    int router_depth  = router_id/ routers_per_level; //which level
+    int routers_per_neighborhood = powi(gK,gN-router_depth-1);
+    int router_neighborhood = pos/routers_per_neighborhood; //coverage of this tree
+    int router_coverage = powi(gK, gN-router_depth);  //span of the tree from this router
+    
+
+    //NCA reached going down
+    if(dest <(router_neighborhood+1)* router_coverage && 
+       dest >=router_neighborhood* router_coverage){
+      //down ports are numbered first
+
+      //ejection
+      if(router_depth == gN-1){
+        out_port = dest%gK;
+      } else {	
+        //find the down port for the destination
+        int router_branch_coverage = powi(gK, gN-(router_depth+1)); 
+        out_port = (dest-router_neighborhood* router_coverage)/router_branch_coverage;
+      }
+    } else {
+      //up ports are numbered last
+      assert(in_channel < gK); //came from a up channel
+
+      int port1 = gK + (f->src % gK);   // Source hashing port
+      // int port1 = gK + (f->dest % gK);  // Destination hashing port
+      int port2 = gK + RandomInt(gK-1);  // Random port
+      // int port2 = gK + ((f->src + (f->dest / gK)) % gK);  // A port
+      // int port2 = gK + r->GetRROffset();  // RR port
+      // r->IncrementRROffset(gK);           // RR port
+      // int port3 = gK + (f->src % gK);   // Source hashing port
+
+      // Switching scheme #1
+      // if (r->GetUsedCredit(port1) > r->GetUsedCredit(port2)) {
+      //   out_port = port2;
+      // } else {
+      //   out_port = port1;
+      // }
+
+
+      // Switching scheme #2
+      if (!r->switch_flag[f->src % gK]) {
+        if (r->GetUsedCredit(port1) > (r->GetUsedCredit(port2) + 16)) {
+          out_port = port2;
+          r->switch_flag[f->src % gK] = true;
+          cout << GetSimTime() << " [A->B] Switch from port " << port1 << " (" << r->GetUsedCredit(port1) << ") to port " << port2 << " (" << r->GetUsedCredit(port2) << ")" << endl;
+        } else {
+          out_port = port1;
+          r->switch_flag[f->src % gK] = false;
+        }
+      } else {
+        if (r->GetUsedCredit(port2) > (r->GetUsedCredit(port1) + 16)) {
+          out_port = port1;
+          r->switch_flag[f->src % gK] = false;
+          cout << GetSimTime() << " [B->A] Switch from port " << port2 << " (" << r->GetUsedCredit(port2) << ") to port " << port1 << " (" << r->GetUsedCredit(port1) << ")" << endl;
+        } else {
+          out_port = port2;
+          r->switch_flag[f->src % gK] = true;
+        }  
+      }
+
+
+      // Switching scheme #3
+      // if (!r->switch_flag[f->src % gK]) {
+      //   if (r->IsVCFull(port1, vcBegin)) {
+      //     out_port = port2;
+      //     r->switch_flag[f->src % gK] = true;
+      //   } else {
+      //     out_port = port1;
+      //     r->switch_flag[f->src % gK] = false;
+      //   }
+      // } else {
+      //   if (r->IsVCFull(port2, vcBegin)) {
+      //     out_port = port1;
+      //     r->switch_flag[f->src % gK] = false;
+      //   } else {
+      //     out_port = port2;
+      //     r->switch_flag[f->src % gK] = true;
+      //   }
+      // }
+    }
+  }
+  outputs->Clear( );
+  
+  outputs->AddRange( out_port, vcBegin, vcEnd );
+}
+
+
+
+void fattree_nca_universalhash( const Router *r, const Flit *f,
+                int in_channel, OutputSet* outputs, bool inject)
+{
+
+  int vcBegin = 0, vcEnd = gNumVCs-1;
+  if ( f->type == Flit::READ_REQUEST ) {
+    vcBegin = gReadReqBeginVC;
+    vcEnd = gReadReqEndVC;
+  } else if ( f->type == Flit::WRITE_REQUEST ) {
+    vcBegin = gWriteReqBeginVC;
+    vcEnd = gWriteReqEndVC;
+  } else if ( f->type ==  Flit::READ_REPLY ) {
+    vcBegin = gReadReplyBeginVC;
+    vcEnd = gReadReplyEndVC;
+  } else if ( f->type ==  Flit::WRITE_REPLY ) {
+    vcBegin = gWriteReplyBeginVC;
+    vcEnd = gWriteReplyEndVC;
+  }
+  assert(((f->vc >= vcBegin) && (f->vc <= vcEnd)) || (inject && (f->vc < 0)));
+
+
+  int out_port;
+
+  if(inject) {
+
+    out_port = -1;
+
+  } else {
+
+
+    int dest = f->dest;
+    int router_id = r->GetID(); //routers are numbered with smallest at the top level
+    int routers_per_level = powi(gK, gN-1);
+    int pos = router_id%routers_per_level;
+    int router_depth  = router_id/ routers_per_level; //which level
+    int routers_per_neighborhood = powi(gK,gN-router_depth-1);
+    int router_neighborhood = pos/routers_per_neighborhood; //coverage of this tree
+    int router_coverage = powi(gK, gN-router_depth);  //span of the tree from this router
+    
+
+    //NCA reached going down
+    if(dest <(router_neighborhood+1)* router_coverage && 
+       dest >=router_neighborhood* router_coverage){
+      //down ports are numbered first
+
+      //ejection
+      if(router_depth == gN-1){
+        out_port = dest%gK;
+      } else {	
+        //find the down port for the destination
+        int router_branch_coverage = powi(gK, gN-(router_depth+1)); 
+        out_port = (dest-router_neighborhood* router_coverage)/router_branch_coverage;
+      }
+    } else {
+      //up ports are numbered last
+      assert(in_channel < gK); //came from a up channel
+
+      // int k1 = f->src;
+      // int k2 = f->dest / gK;
+      // int hash1 = (k1 + k2)*(k1 + k2 + (k1 / gK))/2 + k2;   // Cantor Pairing Function
+      // int hash2 = (k1 + k2)*(k1 + k2 + (k1 / gK))/2 + k1;   // Cantor Pairing Function
+      // int hash2 = pow(2, k1) * (2*k2 + 1) - 1;   // Regan Pairing Function
+
+      // if (RandomInt(1))
+      //   out_port = gK + (hash1 % gK);
+      // else
+      //   out_port = gK + (hash2 % gK);
+
+
+      // // ((ax + b) mod p) mod m
+      // int a = 1 + RandomInt(11-2);
+      // int b = RandomInt(11-1);
+      // out_port = gK + ((((a * (f->src % gK)) + b) % 11) % gK);
+
+
+      int rand_hash = RandomInt(1);
+      if (rand_hash == 0)
+        out_port = gK + ((f->src + (f->dest / gK)) % gK);
+        // out_port = gK + (((f->src / gK) + f->src + f->dest % gK) % gK);
+      else if (rand_hash == 1)
+        out_port = gK + (f->dest % gK);
+      // else
+      //   out_port = gK + (f->src % gK);
+    }
+  }  
+  outputs->Clear( );
+  
+  outputs->AddRange( out_port, vcBegin, vcEnd );
+}
+
+
+void fattree_nca_portlimit( const Router *r, const Flit *f,
+                int in_channel, OutputSet* outputs, bool inject)
+{
+
+  int vcBegin = 0, vcEnd = gNumVCs-1;
+  if ( f->type == Flit::READ_REQUEST ) {
+    vcBegin = gReadReqBeginVC;
+    vcEnd = gReadReqEndVC;
+  } else if ( f->type == Flit::WRITE_REQUEST ) {
+    vcBegin = gWriteReqBeginVC;
+    vcEnd = gWriteReqEndVC;
+  } else if ( f->type ==  Flit::READ_REPLY ) {
+    vcBegin = gReadReplyBeginVC;
+    vcEnd = gReadReplyEndVC;
+  } else if ( f->type ==  Flit::WRITE_REPLY ) {
+    vcBegin = gWriteReplyBeginVC;
+    vcEnd = gWriteReplyEndVC;
+  }
+  assert(((f->vc >= vcBegin) && (f->vc <= vcEnd)) || (inject && (f->vc < 0)));
+
+
+  int out_port;
+
+  if(inject) {
+
+    out_port = -1;
+
+  } else {
+
+
+    int dest = f->dest;
+    int router_id = r->GetID(); //routers are numbered with smallest at the top level
+    int routers_per_level = powi(gK, gN-1);
+    int pos = router_id%routers_per_level;
+    int router_depth  = router_id/ routers_per_level; //which level
+    int routers_per_neighborhood = powi(gK,gN-router_depth-1);
+    int router_neighborhood = pos/routers_per_neighborhood; //coverage of this tree
+    int router_coverage = powi(gK, gN-router_depth);  //span of the tree from this router
+    
+
+    //NCA reached going down
+    if(dest <(router_neighborhood+1)* router_coverage && 
+       dest >=router_neighborhood* router_coverage){
+      //down ports are numbered first
+
+      //ejection
+      if(router_depth == gN-1){
+        out_port = dest%gK;
+      } else {	
+        //find the down port for the destination
+        int router_branch_coverage = powi(gK, gN-(router_depth+1)); 
+        out_port = (dest-router_neighborhood* router_coverage)/router_branch_coverage;
+      }
+    } else {
+      //up ports are numbered last
+      assert(in_channel < gK); //came from a up channel
+
+      int port_option = 4;
+      int rand_port = RandomInt(gK-1);
+      // int in_port = f->src % gK;  // Per port
+      int in_port = f->mid % gK;  // Per message
+      int port_min = (in_port*port_option) % gK; 
+      int port_max = ((in_port+1)*port_option - 1) % gK;
+
+      if (port_max >= port_min) {
+        while (!((rand_port >= port_min) && (rand_port <= port_max))) {
+          rand_port = RandomInt(gK-1);
+        }
+      }
+      else {
+        while (!((rand_port >= port_min) || (rand_port <= port_max))) {
+          rand_port = RandomInt(gK-1);
+        }
+      }
+
+      // if (in_port == 3) {
+      //   cout << "rand_port = " << rand_port << ", port_min = " << port_min << ", port_max = " << port_max << endl;
+      // }
+
+      // int key = ((gC * gK) * (gC * gK) * r->GetInjectedPacket(f->src % gC)) + (f->src * (gC * gK) + f->dest);
+      // unsigned long fibonacci_mult = 11400714819323198485; // (2 ^ (64)) / 1.61803398875, 64 is the word size
+      // int fibonacci_hash = (unsigned long)(key * fibonacci_mult) >> (62 + 2);
+
+      // out_port = gK + ((port_min + ((unsigned long)(key * fibonacci_mult) >> (62 + 2))) % gK);
+
+      // if (in_port == 1)
+      //   cout << "port_min = " << port_min << ", out_port = " << out_port << endl;
+
+      // int rand_port2 = RandomInt(gK-1);
+      // while (!((rand_port2 >= port_min) && (rand_port2 <= port_max))) {
+      //   rand_port2 = RandomInt(gK-1);
+      // }
+      // if (r->GetUsedCredit(gK + rand_port) > r->GetUsedCredit(gK + rand_port2)){
+      //   out_port = gK + rand_port2;
+      // } else {
+      //   out_port =  gK + rand_port;
+      // }
+
+      out_port = gK + rand_port;
+    }
+  }  
+  outputs->Clear( );
+  
+  outputs->AddRange( out_port, vcBegin, vcEnd );
+}
+
+
+void fattree_nca_spread( const Router *r, const Flit *f,
+                int in_channel, OutputSet* outputs, bool inject)
+{
+
+  int vcBegin = 0, vcEnd = gNumVCs-1;
+  if ( f->type == Flit::READ_REQUEST ) {
+    vcBegin = gReadReqBeginVC;
+    vcEnd = gReadReqEndVC;
+  } else if ( f->type == Flit::WRITE_REQUEST ) {
+    vcBegin = gWriteReqBeginVC;
+    vcEnd = gWriteReqEndVC;
+  } else if ( f->type ==  Flit::READ_REPLY ) {
+    vcBegin = gReadReplyBeginVC;
+    vcEnd = gReadReplyEndVC;
+  } else if ( f->type ==  Flit::WRITE_REPLY ) {
+    vcBegin = gWriteReplyBeginVC;
+    vcEnd = gWriteReplyEndVC;
+  }
+  assert(((f->vc >= vcBegin) && (f->vc <= vcEnd)) || (inject && (f->vc < 0)));
+
+
+  int out_port;
+
+  if(inject) {
+
+    out_port = -1;
+
+  } else {
+
+
+    int dest = f->dest;
+    int router_id = r->GetID(); //routers are numbered with smallest at the top level
+    int routers_per_level = powi(gK, gN-1);
+    int pos = router_id%routers_per_level;
+    int router_depth  = router_id/ routers_per_level; //which level
+    int routers_per_neighborhood = powi(gK,gN-router_depth-1);
+    int router_neighborhood = pos/routers_per_neighborhood; //coverage of this tree
+    int router_coverage = powi(gK, gN-router_depth);  //span of the tree from this router
+    
+
+    //NCA reached going down
+    if(dest < (router_neighborhood+1)* router_coverage && 
+       dest >=router_neighborhood* router_coverage){
+      //down ports are numbered first
+
+      //ejection
+      if (router_depth == gN-1) {
+        out_port = dest%gK;
+      } else {	
+        //find the down port for the destination
+        int router_branch_coverage = powi(gK, gN-(router_depth+1)); 
+        out_port = (dest-router_neighborhood* router_coverage)/router_branch_coverage;
+      }
+    } else {
+      //up ports are numbered last
+      assert(in_channel < gK); //came from a up channel
+
+      r->packet_cnt++;
+      r->uplink_spread_dest[f->src % gK].insert(f->dest % gK);
+
+      if (r->packet_cnt == 300) {
+        cout << "\nRouter " << r->GetID();
+        r->pattern.clear();
+        for (int j = 0; j < gK; j++) {
+          r->pattern.push_back(r->GenerateCyclic(gK, r->src_avai));
+        }
+        int index = 0;
+        for (int i = 0; i < gK; i++)
+        {
+          cout << "\nSize: " << r->uplink_spread_dest[i].size();
+          // assert(r->uplink_spread_dest[i].size() < gK);
+          assert(r->uplink_spread_dest[i].size() <= gK);
+          if(r->uplink_spread_dest[i].size() == 0)
+            r->spread_degree[i] = 1;
+          else
+            r->spread_degree[i] = int(gK / r->uplink_spread_dest[i].size());
+          cout << "  \nSource port " << i << " has " << r->spread_degree[i] << " options: ";
+          // r->src_avai.clear();
+          r->uplink_spread_list[i].clear();
+          for (int j = 0; j < r->spread_degree[i]; j++) {
+            int spread_component = r->pattern[index];
+            index = (index + 1) % gK;
+            assert(spread_component < gK);
+            cout << spread_component << " ";
+            r->uplink_spread_list[i].push_back(spread_component);
+          }
+        }
+        cout << endl;
+      }        
+
+      if (r->packet_cnt >= 300) {
+        // int rand_port = RandomInt(r->spread_degree[f->src % gK] - 1);
+        // out_port = gK + r->uplink_spread_list[f->src % gK][rand_port];
+        out_port = gK + r->uplink_spread_list[f->src % gK][r->spread_pid[f->src % gK]];
+        r->spread_pid[f->src % gK] = (r->spread_pid[f->src % gK] + 1) % r->uplink_spread_list[f->src % gK].size();
+      }
+      else {
+        out_port = gK + r->GetRROffset();
+        r->IncrementRROffset(gK);
+      }
+    }
+  }  
+  outputs->Clear( );
+  
+  outputs->AddRange( out_port, vcBegin, vcEnd );
+}
+
+
 
 void fattree_anca_bounded( const Router *r, const Flit *f,
                 int in_channel, OutputSet* outputs, bool inject)
@@ -3419,7 +4102,6 @@ void InitializeRoutingMap( const Configuration & config )
   gRoutingFunctionMap["nca_desthash_fattree"]             = &fattree_nca_desthash;
   gRoutingFunctionMap["nca_xorhash_fattree"]              = &fattree_nca_xorhash;
   gRoutingFunctionMap["nca_diagonalhash_fattree"]         = &fattree_nca_diagonalhash;
-  gRoutingFunctionMap["nca_roundrobin_fattree"]           = &fattree_nca_roundrobin;
   gRoutingFunctionMap["nca_fibonaccihash_fattree"]        = &fattree_nca_fibonaccihash;
   gRoutingFunctionMap["nca_fibonacci_pid_hash_fattree"]   = &fattree_nca_fibonacci_pid_hash;
   gRoutingFunctionMap["nca_fibonacci_inj_hash_fattree"]   = &fattree_nca_fibonacci_inj_hash;
@@ -3436,31 +4118,39 @@ void InitializeRoutingMap( const Configuration & config )
   gRoutingFunctionMap["nca_cyclic_fattree"]               = &fattree_nca_cyclic;
   gRoutingFunctionMap["nca_pattern_fattree"]              = &fattree_nca_pattern;
   gRoutingFunctionMap["nca_desthash_adaptive_fattree"]    = &fattree_nca_desthash_adaptive;
+  gRoutingFunctionMap["nca_roundrobin_fattree"]           = &fattree_nca_roundrobin;
+  gRoutingFunctionMap["nca_roundrobin_adaptive_fattree"]  = &fattree_nca_roundrobin_adaptive;
+  gRoutingFunctionMap["nca_rrrr_fattree"]                 = &fattree_nca_rrrr;
+  gRoutingFunctionMap["anca_source_fattree"]              = &fattree_anca_source;
+  gRoutingFunctionMap["nca_hybrid_fattree"]               = &fattree_nca_hybrid;
+  gRoutingFunctionMap["nca_spread_fattree"]               = &fattree_nca_spread;
+  gRoutingFunctionMap["nca_universalhash_fattree"]        = &fattree_nca_universalhash;
+  gRoutingFunctionMap["nca_portlimit_fattree"]            = &fattree_nca_portlimit;
 
-  gRoutingFunctionMap["dim_order_mesh"]  = &dim_order_mesh;
-  gRoutingFunctionMap["dim_order_ni_mesh"]  = &dim_order_ni_mesh;
+  gRoutingFunctionMap["dim_order_mesh"]      = &dim_order_mesh;
+  gRoutingFunctionMap["dim_order_ni_mesh"]   = &dim_order_ni_mesh;
   gRoutingFunctionMap["dim_order_pni_mesh"]  = &dim_order_pni_mesh;
-  gRoutingFunctionMap["dim_order_torus"] = &dim_order_torus;
-  gRoutingFunctionMap["dim_order_ni_torus"] = &dim_order_ni_torus;
+  gRoutingFunctionMap["dim_order_torus"]     = &dim_order_torus;
+  gRoutingFunctionMap["dim_order_ni_torus"]  = &dim_order_ni_torus;
   gRoutingFunctionMap["dim_order_bal_torus"] = &dim_order_bal_torus;
 
-  gRoutingFunctionMap["romm_mesh"]       = &romm_mesh; 
-  gRoutingFunctionMap["romm_ni_mesh"]    = &romm_ni_mesh;
+  gRoutingFunctionMap["romm_mesh"]           = &romm_mesh; 
+  gRoutingFunctionMap["romm_ni_mesh"]        = &romm_ni_mesh;
 
-  gRoutingFunctionMap["min_adapt_mesh"]   = &min_adapt_mesh;
-  gRoutingFunctionMap["min_adapt_torus"]  = &min_adapt_torus;
+  gRoutingFunctionMap["min_adapt_mesh"]      = &min_adapt_mesh;
+  gRoutingFunctionMap["min_adapt_torus"]     = &min_adapt_torus;
 
-  gRoutingFunctionMap["planar_adapt_mesh"] = &planar_adapt_mesh;
+  gRoutingFunctionMap["planar_adapt_mesh"]   = &planar_adapt_mesh;
 
   // FIXME: This is broken.
   //  gRoutingFunctionMap["limited_adapt_mesh"] = &limited_adapt_mesh;
 
-  gRoutingFunctionMap["valiant_mesh"]  = &valiant_mesh;
-  gRoutingFunctionMap["valiant_torus"] = &valiant_torus;
-  gRoutingFunctionMap["valiant_ni_torus"] = &valiant_ni_torus;
+  gRoutingFunctionMap["valiant_mesh"]        = &valiant_mesh;
+  gRoutingFunctionMap["valiant_torus"]       = &valiant_torus;
+  gRoutingFunctionMap["valiant_ni_torus"]    = &valiant_ni_torus;
 
-  gRoutingFunctionMap["dest_tag_fly"] = &dest_tag_fly;
+  gRoutingFunctionMap["dest_tag_fly"]        = &dest_tag_fly;
 
-  gRoutingFunctionMap["chaos_mesh"]  = &chaos_mesh;
-  gRoutingFunctionMap["chaos_torus"] = &chaos_torus;
+  gRoutingFunctionMap["chaos_mesh"]          = &chaos_mesh;
+  gRoutingFunctionMap["chaos_torus"]         = &chaos_torus;
 }

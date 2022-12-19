@@ -139,12 +139,48 @@ public:
   virtual int dest(int source);
 };
 
-// THO: Selective Permutation
+// THO: Selective Unique Permutation
+class PermUniqueSelectiveTrafficPattern : public RandomTrafficPattern {
+private:
+  vector<int> _dest;
+public:
+  PermUniqueSelectiveTrafficPattern(int nodes);
+  virtual int dest(int source);
+};
+
+// THO: Selective Random Permutation
 class PermRandomSelectiveTrafficPattern : public RandomTrafficPattern {
 private:
   vector<int> _dest;
 public:
   PermRandomSelectiveTrafficPattern(int nodes);
+  virtual int dest(int source);
+};
+
+// THO: Group Permutation
+class PermGroupSelectiveTrafficPattern : public RandomTrafficPattern {
+private:
+  // int                  _selection;  // Number of selection for destination
+  vector<int>          _dest;
+  vector<int>          _cyclic_dest;
+  vector<set<int> >    _dest_set;   // Unique set -> all sources have same no. of destinations
+  vector<vector<int> > _dest_vec;   // Not unique -> Some sources will have more destinations
+public:
+  PermGroupSelectiveTrafficPattern(int nodes);
+  virtual int dest(int source);
+};
+
+// THO: Hotspot traffic (Hotspot)
+class UniformRandomHotspotTrafficPattern : public RandomTrafficPattern {
+public:
+  UniformRandomHotspotTrafficPattern(int nodes);
+  virtual int dest(int source);
+};
+
+// THO: Hotspot traffic (Background UR)
+class UniformRandomBackgroundTrafficPattern : public RandomTrafficPattern {
+public:
+  UniformRandomBackgroundTrafficPattern(int nodes);
   virtual int dest(int source);
 };
 

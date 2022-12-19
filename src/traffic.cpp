@@ -28,6 +28,7 @@
 #include <iostream>
 #include <sstream>
 #include <ctime>
+#include <algorithm>
 #include "random_utils.hpp"
 #include "traffic.hpp"
 
@@ -84,8 +85,8 @@ TrafficPattern * TrafficPattern::New(string const & pattern, int nodes,
 	  perm_seed = config->GetInt("perm_seed");
 	}
       } else {
-	cout << "Error: Missing parameter for random permutation traffic pattern: " << pattern << endl;
-	exit(-1);
+        cout << "Error: Missing parameter for random permutation traffic pattern: " << pattern << endl;
+        exit(-1);
       }
     } else {
       perm_seed = atoi(params[0].c_str());
@@ -97,10 +98,16 @@ TrafficPattern * TrafficPattern::New(string const & pattern, int nodes,
     result = new UniformRandomSelectiveTrafficPattern(nodes);
   } else if (pattern_name == "randperm_sel") {
     result = new PermRandomSelectiveTrafficPattern(nodes);
+  } else if (pattern_name == "groupperm") {
+    result = new PermGroupSelectiveTrafficPattern(nodes);
   } else if (pattern_name == "adversarial_sel") {
     result = new AdversarialRandomSelectiveTrafficPattern(nodes);
   } else if(pattern_name == "modulo_worst") {
     result = new ModuloWorstTrafficPattern(nodes);
+  } else if(pattern_name == "rand_hotspot") {
+    result = new UniformRandomHotspotTrafficPattern(nodes);
+  } else if (pattern_name == "background_uniform") {
+    result = new UniformRandomBackgroundTrafficPattern(nodes);
   } else if(pattern_name == "background") {
     vector<int> excludes = tokenize_int(params[0]);
     result = new UniformBackgroundTrafficPattern(nodes, excludes);
@@ -142,9 +149,9 @@ TrafficPattern * TrafficPattern::New(string const & pattern, int nodes,
     int k = -1;
     if(params.size() < 1) {
       if(config) {
-	k = config->GetInt("k");
+        k = config->GetInt("k");
       } else {
-	missing_params = true;
+        missing_params = true;
       }
     } else {
       k = atoi(params[0].c_str());
@@ -152,9 +159,9 @@ TrafficPattern * TrafficPattern::New(string const & pattern, int nodes,
     int n = -1;
     if(params.size() < 2) {
       if(config) {
-	n = config->GetInt("n");
+        n = config->GetInt("n");
       } else {
-	missing_params = true;
+        missing_params = true;
       }
     } else {
       n = atoi(params[1].c_str());
@@ -170,9 +177,9 @@ TrafficPattern * TrafficPattern::New(string const & pattern, int nodes,
     int k = -1;
     if(params.size() < 1) {
       if(config) {
-	k = config->GetInt("k");
+        k = config->GetInt("k");
       } else {
-	missing_params = true;
+        missing_params = true;
       }
     } else {
       k = atoi(params[0].c_str());
@@ -180,9 +187,9 @@ TrafficPattern * TrafficPattern::New(string const & pattern, int nodes,
     int n = -1;
     if(params.size() < 2) {
       if(config) {
-	n = config->GetInt("n");
+        n = config->GetInt("n");
       } else {
-	missing_params = true;
+        missing_params = true;
       }
     } else {
       n = atoi(params[1].c_str());
@@ -190,9 +197,9 @@ TrafficPattern * TrafficPattern::New(string const & pattern, int nodes,
     int xr = -1;
     if(params.size() < 3) {
       if(config) {
-	xr = config->GetInt("xr");
+        xr = config->GetInt("xr");
       } else {
-	missing_params = true;
+        missing_params = true;
       }
     } else {
       xr = atoi(params[2].c_str());
@@ -215,7 +222,7 @@ TrafficPattern * TrafficPattern::New(string const & pattern, int nodes,
     vector<int> hotspots = tokenize_int(params[0]);
     for(size_t i = 0; i < hotspots.size(); ++i) {
       if(hotspots[i] < 0) {
-	hotspots[i] = RandomInt(nodes - 1);
+        hotspots[i] = RandomInt(nodes - 1);
       }
     }
     vector<int> rates;
@@ -393,7 +400,7 @@ void RandomPermutationTrafficPattern::randomize(int seed)
     int cnt = 0;
     while((cnt < ind) || (_dest[j] != -1)) {
       if(_dest[j] == -1) {
-	++cnt;
+        ++cnt;
       }
       ++j;
       assert(j < _nodes);
@@ -469,7 +476,7 @@ int AdversarialRandomSelectiveTrafficPattern::dest(int source)
 {
   assert((source >= 0) && (source < _nodes));
   assert((_nodes % gK) == 0);
-  assert(_compute_nodes.count(source));
+  // assert(_compute_nodes.count(source));
 
   int const src_router = source/gK;
   // Change this dest_router if running clustered
@@ -477,15 +484,123 @@ int AdversarialRandomSelectiveTrafficPattern::dest(int source)
 
   int dest = (dest_router + RandomInt(gK - 1)) % _nodes;
 
-  while(_compute_nodes.count(dest) != 0) {
-    dest = (dest_router + RandomInt(gK - 1)) % _nodes;
-  }
+  // while(_compute_nodes.count(dest) != 0) {
+  //   dest = (dest_router + RandomInt(gK - 1)) % _nodes;
+  // }
 
   return dest;
 }
 
+
+// THO: PERM but send to other routers (*All equal nodes*)
+// Unlike randperm, all channels must be used (This traffic won't always work)
+// PermGroupSelectiveTrafficPattern::PermGroupSelectiveTrafficPattern(int nodes)
+//   : RandomTrafficPattern(nodes)
+// {
+// }
+
+// int PermGroupSelectiveTrafficPattern::dest(int source)
+// {
+//   assert((source >= 0) && (source < _nodes));
+//   assert((_nodes % gK) == 0);
+
+//   // int src_router = source/gK;
+
+//   if (_dest.empty()) {
+//     for(int src = 0; src < _nodes; src++) {
+//       int rand_dest = RandomInt(_nodes-1);
+//       int src_router = src/gK;
+//       // cout << "Condition: >= "
+//       // cout << "rand_dest = " << rand_dest << endl;
+//       // Destination mustn't connect to the same router as source
+//       while(((rand_dest >= (src_router*gK)) && (rand_dest <= (src_router*gK + gK - 1))) || (std::find(_dest.begin(), _dest.end(), rand_dest) != _dest.end())) {
+//         rand_dest = RandomInt(_nodes-1);
+//         // cout << "rand_dest = " << rand_dest << endl;
+//       }
+//       cout << "source " << src << " push " << rand_dest << endl;
+//       _dest.push_back(rand_dest);
+//     }
+//     for(int src = 0; src < _nodes; src++) {
+//       cout << "source = " << src << ", dest = " << _dest[src] << endl;
+//     }
+//   }
+
+//   return _dest[source];
+// }
+
+
+// THO: PERM but each source has a list of destinations instead of only 1 (*All equal nodes*)
+//      *This traffic is not completely load balanced
+PermGroupSelectiveTrafficPattern::PermGroupSelectiveTrafficPattern(int nodes)
+  : RandomTrafficPattern(nodes)
+{
+}
+
+
+int PermGroupSelectiveTrafficPattern::dest(int source)
+{
+  assert((source >= 0) && (source < _nodes));
+  assert((_nodes % gK) == 0);
+
+  if (_dest_vec.empty()) {
+    cout << "GroupPerm trafic: " << endl;
+    _dest_vec.resize(_nodes);
+    for (int src = 0; src < _nodes; src++) {
+      int _list_size = 5; // Fixed number of destination
+      // int _list_size = RandomInt(_nodes - 1);  // Random number of destination
+      while (_list_size == 0) {
+        _list_size = RandomInt(_nodes - 1);
+      }
+      // // Use this part to have duplicate elements (traffic has weights)
+      // for (int i = 0; i < _list_size; i++) {
+      //   int temp_dest = RandomInt(_nodes - 1);
+      //   _dest_vec[src].push_back(temp_dest);
+      // }
+      // Use this part to make sure there is no duplicate elements
+      // if (_cyclic_dest.empty()) {
+      //   for (int i = 0; i < _nodes; i++)
+      //     _cyclic_dest.push_back(i);
+      // }
+      while (_dest_vec[src].size() < _list_size) {
+        if (_cyclic_dest.empty()) {
+          for (int i = 0; i < _nodes; i++)
+            _cyclic_dest.push_back(i);
+        }
+
+        int temp_dest = RandomInt(_cyclic_dest.size() - 1);
+        _dest_vec[src].push_back(_cyclic_dest[temp_dest]);
+        int size_before = _dest_vec[src].size();
+        std::sort(_dest_vec[src].begin(), _dest_vec[src].end());
+        vector<int>::iterator ip;
+        ip = std::unique(_dest_vec[src].begin(), _dest_vec[src].begin() + _dest_vec[src].size());
+        _dest_vec[src].resize(std::distance(_dest_vec[src].begin(), ip));
+        int size_after = _dest_vec[src].size();
+        if (size_after == size_before) {
+          swap(_cyclic_dest[temp_dest], _cyclic_dest[_cyclic_dest.size() - 1]);
+          _cyclic_dest.pop_back();
+          cout << "  Pop!!!";
+        }
+      }
+      cout << "  Nodes " << src << ":";
+      for (int j = 0; j < _dest_vec[src].size(); j++) {
+        cout << " " << _dest_vec[src][j];
+      }
+      cout << endl;
+    }
+  }
+
+  int rand_dest = RandomInt(_dest_vec[source].size() - 1);
+
+  // if (source == 1)
+  //   cout << "Source 1 -> Dest " << _dest_vec[source][rand_dest] << endl;
+
+  return _dest_vec[source][rand_dest];
+}
+
+
 // THO: Select destination using _compute_nodes (PERM)
 // Unlike randperm, there will be endpoint congestion here
+// *Note: Since compute nodes > memory nodes, there will always be endpoint congestion for requests
 PermRandomSelectiveTrafficPattern::PermRandomSelectiveTrafficPattern(int nodes)
   : RandomTrafficPattern(nodes)
 {
@@ -497,17 +612,18 @@ int PermRandomSelectiveTrafficPattern::dest(int source)
   assert((_nodes % gK) == 0);
   assert(_compute_nodes.count(source));
 
-  set<int> dest_list = _memory_nodes;
-
   if (_dest.empty()) {
     _dest.resize(_nodes);
     for(int src = 0; src < _nodes; src++) {
+      // Memory nodes will not send out requests
       if(_compute_nodes.count(source) == 0) {
         _dest[src] = -1;
       }
       else {
         int rand_dest = RandomInt(_nodes-1);
+        // Destination mustn't be compute nodes (must be memory nodes)
         while(_compute_nodes.count(rand_dest) != 0) {
+
           rand_dest = RandomInt(_nodes-1);
         }
         _dest[src] = rand_dest;
@@ -518,6 +634,7 @@ int PermRandomSelectiveTrafficPattern::dest(int source)
   assert(_dest[source] != -1);
   return _dest[source];
 }
+
 
 // THO: Worst case for Source and Destination hashing (*All equal nodes*)
 ModuloWorstTrafficPattern::ModuloWorstTrafficPattern(int nodes)
@@ -535,6 +652,55 @@ int ModuloWorstTrafficPattern::dest(int source)
   int dest = (dest_router + src_router) % _nodes;
 
   return dest;
+}
+
+// THO: Hotspot traffic (Evaluate separately Hotspot vs. background)
+UniformRandomHotspotTrafficPattern::UniformRandomHotspotTrafficPattern(int nodes)
+  : RandomTrafficPattern(nodes)
+{
+}
+
+int UniformRandomHotspotTrafficPattern::dest(int source)
+{
+  assert((source >= 0) && (source < _nodes));
+  
+  int rand_dest = RandomInt(_nodes-1);
+  // Background (not send to hs_dest)
+  if (!_hs_send_all && _hs_srcs.count(source)==0) {
+    assert(0);
+    while(_hs_dests.count(rand_dest) != 0) {
+      rand_dest = RandomInt(_nodes-1);
+    }
+  }
+  // Hotspot (send to hs_dest)
+  else {
+    while(_hs_dests.count(rand_dest) == 0) {
+      rand_dest = RandomInt(_nodes-1);
+    }
+  }
+
+  // cout << "[HOTSPOT] Source: " << source << ", Destination: " << rand_dest << endl;
+
+  return rand_dest;
+}
+
+// THO: Hotspot traffic (Evaluate traffics altogether)
+UniformRandomBackgroundTrafficPattern::UniformRandomBackgroundTrafficPattern(int nodes)
+  : RandomTrafficPattern(nodes)
+{
+}
+
+int UniformRandomBackgroundTrafficPattern::dest(int source)
+{
+  assert((source >= 0) && (source < _nodes));
+  
+  int rand_dest = RandomInt(_nodes-1);
+  while(_hs_dests.count(rand_dest) != 0 || _hs_srcs.count(rand_dest) != 0) {
+    rand_dest = RandomInt(_nodes-1);
+  }
+
+  // cout << "[BACKGROUND] Source: " << source << ", Destination: " << rand_dest << endl;
+  return rand_dest;
 }
 
 UniformBackgroundTrafficPattern::UniformBackgroundTrafficPattern(int nodes, vector<int> excluded_nodes)
@@ -609,7 +775,7 @@ int Taper64TrafficPattern::dest(int source)
 BadFlatflyTrafficPattern::BadFlatflyTrafficPattern(int nodes, int k, int n)
   : DigitPermutationTrafficPattern(nodes, k, n, 1)
 {
-  assert(n == 1); // This is not a worst-case traffic for multi-dimensional flattened butterfly
+  // assert(n == 1); // This is not a worst-case traffic for multi-dimensional flattened butterfly
 }
 
 int BadFlatflyTrafficPattern::dest(int source)
