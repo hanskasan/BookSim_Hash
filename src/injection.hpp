@@ -30,6 +30,9 @@
 
 #include "config_utils.hpp"
 
+// THO: Additionals
+#include "globals.hpp"
+
 using namespace std;
 
 class InjectionProcess {
@@ -50,6 +53,21 @@ public:
   BernoulliInjectionProcess(int nodes, double rate);
   virtual bool test(int source);
 };
+
+
+// THO: Hotspot-related
+class HotspotInjectionProcess : public InjectionProcess {
+public:
+  HotspotInjectionProcess(int nodes, double rate);
+  virtual bool test(int source);
+};
+
+class BackgroundInjectionProcess : public InjectionProcess {
+public:
+  BackgroundInjectionProcess(int nodes, double rate);
+  virtual bool test(int source);
+};
+
 
 class OnOffInjectionProcess : public InjectionProcess {
 private:

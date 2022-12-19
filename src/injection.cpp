@@ -74,16 +74,20 @@ InjectionProcess * InjectionProcess::New(string const & inject, int nodes,
   vector<string> params = tokenize_str(param_str);
 
   InjectionProcess * result = NULL;
-  if(process_name == "bernoulli") {
+  if (process_name == "bernoulli") {
     result = new BernoulliInjectionProcess(nodes, load);
+  } else if (process_name == "hotspot_injection") {
+    result = new HotspotInjectionProcess(nodes, load);
+  } else if (process_name == "background_injection") {
+    result = new BackgroundInjectionProcess(nodes, load);
   } else if(process_name == "on_off") {
     bool missing_params = false;
     double alpha = numeric_limits<double>::quiet_NaN();
     if(params.size() < 1) {
       if(config) {
-	alpha = config->GetFloat("burst_alpha");
+        alpha = config->GetFloat("burst_alpha");
       } else {
-	missing_params = true;
+        missing_params = true;
       }
     } else {
       alpha = atof(params[0].c_str());
@@ -91,9 +95,9 @@ InjectionProcess * InjectionProcess::New(string const & inject, int nodes,
     double beta = numeric_limits<double>::quiet_NaN();
     if(params.size() < 2) {
       if(config) {
-	beta = config->GetFloat("burst_beta");
+        beta = config->GetFloat("burst_beta");
       } else {
-	missing_params = true;
+        missing_params = true;
       }
     } else {
       beta = atof(params[1].c_str());
@@ -121,7 +125,7 @@ InjectionProcess * InjectionProcess::New(string const & inject, int nodes,
       initial.resize(nodes, initial.back());
     } else {
       for(int n = 0; n < nodes; ++n) {
-	initial[n] = RandomInt(1);
+        initial[n] = RandomInt(1);
       }
     }
     result = new OnOffInjectionProcess(nodes, load, alpha, beta, r1, initial);
@@ -147,7 +151,44 @@ bool BernoulliInjectionProcess::test(int source)
 }
 
 //=============================================================
+// THO: Hotspot-related injection
+// Hotspot traffic injection
+HotspotInjectionProcess::HotspotInjectionProcess(int nodes, double rate)
+  : InjectionProcess(nodes, rate)
+{
 
+}
+
+bool HotspotInjectionProcess::test(int source)
+{
+  assert((source >= 0) && (source < _nodes));
+  if (_hs_dests.count(source) != 0)
+    return false;
+  else {
+    if (_hs_srcs.count(source) == 0)
+      return false;
+    else
+      return (RandomFloat() < _rate);
+  }
+}
+
+// Background traffic injection
+BackgroundInjectionProcess::BackgroundInjectionProcess(int nodes, double rate)
+  : InjectionProcess(nodes, rate)
+{
+
+}
+
+bool BackgroundInjectionProcess::test(int source)
+{
+  assert((source >= 0) && (source < _nodes));
+  if (_hs_srcs.count(source) != 0 || _hs_dests.count(source) != 0)
+    return false;
+  else
+    return (RandomFloat() < _rate);
+}
+
+//=============================================================
 OnOffInjectionProcess::OnOffInjectionProcess(int nodes, double rate, 
 					     double alpha, double beta, 
 					     double r1, vector<int> initial)
