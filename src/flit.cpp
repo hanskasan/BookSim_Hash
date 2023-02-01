@@ -89,6 +89,12 @@ void Flit::Reset()
   uptime    = -1 ;
   ewtime    = -1 ;
 
+  rc_time   = -1 ;
+  in_time   = -1;
+  wait_time = 0;
+  service_time = 0;
+  see_queue = 0;
+
   rtime    = -1 ;
 
   // HANS: Additionals for reordering
@@ -96,6 +102,8 @@ void Flit::Reset()
 
   // HANS: Additionals for message size
   is_large = false;
+
+  is_small = false;
 }  
 
 Flit * Flit::New() {

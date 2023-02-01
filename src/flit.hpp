@@ -91,6 +91,12 @@ public:
   mutable int uptime; // Waiting time due to uplink contention
   mutable int ewtime; // Waiting time due to endpoint congestion
 
+  mutable int rc_time; // Time when starting RC stage
+  mutable int in_time; // Tme when injected to the input buffer
+  mutable int wait_time; // Then from injection to and ejection from the input buffer
+  mutable int service_time; // Total service time
+  mutable int see_queue; // Total observed queue before arrival
+
   int rtime; // Time when entering reordering buffer
 
   // HANS: Additionals for reordering
@@ -99,6 +105,8 @@ public:
   // HANS: Additionals for message size
   bool is_large;
 
+
+  mutable bool is_small;
   mutable int out_port;
 
   void Reset();
