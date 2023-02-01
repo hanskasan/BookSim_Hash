@@ -224,6 +224,8 @@ IQRouter::IQRouter( Configuration const & config, Module *parent,
   spread_degree.resize(gC);
   spread_pid.resize(gC, 0);
   switch_flag.resize(gC, false);
+
+  dest_list.resize(gC);   // List of destination for each source
   
 }
 
@@ -491,6 +493,16 @@ void IQRouter::_InputQueuing( )
       }
       *gWatchOut << ")." << endl;
     }
+
+    if (f->head){
+      f->see_queue += cur_buf->GetOccupancy(vc);
+      f->in_time = GetSimTime();
+    }
+
+    // if ((this->GetID() == 6) && (input == 15)){
+      // cout << GetSimTime() << " - Insert flit " << f->id << ", it sees " << cur_buf->GetOccupancy(vc) << " flits" << endl;
+    // }
+    
     cur_buf->AddFlit(vc, f);
 
 #ifdef TRACK_FLOWS
@@ -506,8 +518,11 @@ void IQRouter::_InputQueuing( )
       assert(f->head);
       assert(_switch_hold_vc[input*_input_speedup + vc%_input_speedup] != vc);
       if(_routing_delay) {
-	cur_buf->SetState(vc, VC::routing);
-	_route_vcs.push_back(make_pair(-1, make_pair(input, vc)));
+	      cur_buf->SetState(vc, VC::routing);
+	      _route_vcs.push_back(make_pair(-1, make_pair(input, vc)));
+
+        // HANS: To calculate service time
+        f->rc_time = GetSimTime();
       } else {
 	if(f->watch) {
 	  *gWatchOut << GetSimTime() << " | " << FullName() << " | "
@@ -609,6 +624,9 @@ void IQRouter::_RouteEvaluate( )
     assert(f);
     assert(f->vc == vc);
     assert(f->head);
+
+    // HANS: To calculate service time
+    // f->rc_time = GetSimTime();
 
     // HANS: To track waiting time due to endpoint congestion
     if (((f->src / gC) + gK)== this->GetID()){
@@ -1324,6 +1342,8 @@ void IQRouter::_SWHoldUpdate( )
 	  if(_routing_delay) {
 	    cur_buf->SetState(vc, VC::routing);
 	    _route_vcs.push_back(make_pair(-1, item.second.first));
+
+      assert(0);
 	  } else {
 	    if(nf->watch) {
 	      *gWatchOut << GetSimTime() << " | " << FullName() << " | "
@@ -2140,6 +2160,31 @@ void IQRouter::_SWAllocUpdate( )
 
       cur_buf->RemoveFlit(vc);
 
+      // if ((this->GetID() == 6) && (input == 15)){
+      //   cout << GetSimTime() << " - Remove flit " << f->id << endl;
+      // }
+
+      if (f->head){
+        if (f->rc_time < 0)
+          cout << GetSimTime() << " - fID: " << f->id << " | RC time: " << f->rc_time << endl;
+
+        assert(f->rc_time >= 0);
+        // cout << "Service time: " << GetSimTime() - f->rc_time << endl;
+
+        if (f->head){
+          f->wait_time += GetSimTime() - f->in_time;
+          f->service_time += GetSimTime() - f->rc_time;
+        }
+
+        if (f->watch){
+          cout << GetSimTime() << " - Service time for flit " << f->id << ", packet " << f->pid << ", message " << f->mid << " at router " << this->GetID() << " is " << GetSimTime() - f->rc_time << endl;
+        }
+      }
+
+      // if ((this->GetID() == 0) && (input == 0)){
+      //   cout << GetSimTime() << " - Remove " << f->id << endl;
+      // }
+
       // HANS: To track waiting time due to endpoint congestion
       if ((f->head) && (((f->dest / gC) + gK)== this->GetID())){
         int temp = f->ewtime;
@@ -2222,6 +2267,9 @@ void IQRouter::_SWAllocUpdate( )
 	  if(_routing_delay) {
 	    cur_buf->SetState(vc, VC::routing);
 	    _route_vcs.push_back(make_pair(-1, item.second.first));
+
+      // HANS: To calculate service time
+      nf->rc_time = GetSimTime();
 	  } else {
 	    if(nf->watch) {
 	      *gWatchOut << GetSimTime() << " | " << FullName() << " | "
@@ -2595,7 +2643,7 @@ int IQRouter::GetChanUtil(int output){
 
   assert((output >= 0) && (output < _outputs));
 
-  int window = 100;
+  int window = 1;
 
   while ((!_util_vect[output].empty()) && (_util_vect[output].front() + window) <= GetSimTime()){
     _util_vect[output].pop();

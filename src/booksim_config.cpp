@@ -175,6 +175,9 @@ BookSimConfig::BookSimConfig( )
   _int_map["perm_seed"] = 0; // seed value for random permuation trafficpattern generator
   AddStrField("perm_seed", ""); // workaround to allow special "time" value
 
+  _int_map["perm_elem"] = 2; // Tho: number of destinations for permutation traffic
+  AddStrField("perm_elem", "");
+
   _float_map["injection_rate"]       = 0.1;
   AddStrField("injection_rate", ""); // workaraound to allow for vector specification
   

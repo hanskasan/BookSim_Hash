@@ -130,6 +130,7 @@ public:
   mutable vector<pair<int, bool> > uplink_register;
   mutable vector<int>              src_avai;
   mutable vector<int>              pattern;
+  mutable vector<vector<int> >     dest_list;   // List of destination for each source, use vector for searching
   // inline int RouterRandom(int k) const {return RandomInt(k);}
 
   // THO: Spreading
