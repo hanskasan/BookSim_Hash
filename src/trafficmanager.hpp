@@ -180,6 +180,12 @@ protected:
   vector<double> _overall_avg_nlat;  
   vector<double> _overall_max_nlat;  
 
+  // Tho: nlat between multiple routers 
+  vector<Stats *> _inter_nlat_stats;  
+  vector<double> _overall_min_inter_nlat;  
+  vector<double> _overall_avg_inter_nlat;  
+  vector<double> _overall_max_inter_nlat;   
+
   vector<Stats *> _flat_stats;     
   vector<double> _overall_min_flat;  
   vector<double> _overall_avg_flat;  
@@ -210,6 +216,11 @@ protected:
   vector<double> _overall_min_read_plat;  
   vector<double> _overall_avg_read_plat;  
   vector<double> _overall_max_read_plat;
+
+  vector<Stats *> _small_read_plat_stats;     
+  vector<double> _overall_min_small_read_plat;  
+  vector<double> _overall_avg_small_read_plat;  
+  vector<double> _overall_max_small_read_plat;
 
   vector<Stats *> _write_plat_stats;     
   vector<double> _overall_min_write_plat;  
@@ -247,6 +258,12 @@ protected:
   vector<double> _overall_min_ewlat;  
   vector<double> _overall_avg_ewlat;  
   vector<double> _overall_max_ewlat;
+
+  // HANS: Service time statistics
+  vector<Stats *> _service_stats;     
+  vector<double> _overall_min_service;  
+  vector<double> _overall_avg_service;  
+  vector<double> _overall_max_service;
 
   // HANS: Channel utilization statistics
   static const int _num_channels = 32; // Uplink + downlink
@@ -291,6 +308,7 @@ protected:
 
   vector<int> _slowest_packet;
   vector<int> _slowest_flit;
+  vector<int> _longest_service_time;
 
   map<string, Stats *> _stats;
 
@@ -375,6 +393,9 @@ protected:
   int _read_plat_class[_num_cell] = {0};
   int _write_plat_class[_num_cell] = {0};
   int _rlat_class[_num_cell_rlat] = {0};
+  int _seequeue_class[_num_cell] = {0};
+  int _waittime_class[_num_cell] = {0};
+  int _service_class[_num_cell] = {0};
 
   // ============ Internal methods ============ 
 protected:

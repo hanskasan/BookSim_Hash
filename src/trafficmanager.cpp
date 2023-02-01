@@ -478,6 +478,11 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     _overall_avg_nlat.resize(_classes, 0.0);
     _overall_max_nlat.resize(_classes, 0.0);
 
+    _inter_nlat_stats.resize(_classes);
+    _overall_min_inter_nlat.resize(_classes, 0.0);
+    _overall_avg_inter_nlat.resize(_classes, 0.0);
+    _overall_max_inter_nlat.resize(_classes, 0.0);
+
     _flat_stats.resize(_classes);
     _overall_min_flat.resize(_classes, 0.0);
     _overall_avg_flat.resize(_classes, 0.0);
@@ -493,6 +498,11 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     _overall_min_read_plat.resize(_classes, 0.0);
     _overall_avg_read_plat.resize(_classes, 0.0);
     _overall_max_read_plat.resize(_classes, 0.0);
+
+    _small_read_plat_stats.resize(_classes);
+    _overall_min_small_read_plat.resize(_classes, 0.0);
+    _overall_avg_small_read_plat.resize(_classes, 0.0);
+    _overall_max_small_read_plat.resize(_classes, 0.0);
 
     _write_plat_stats.resize(_classes);
     _overall_min_write_plat.resize(_classes, 0.0);
@@ -538,6 +548,11 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     _overall_min_ewlat.resize(_classes, 0.0);
     _overall_avg_ewlat.resize(_classes, 0.0);
     _overall_max_ewlat.resize(_classes, 0.0);
+
+    _service_stats.resize(_classes);
+    _overall_min_service.resize(_classes, 0.0);
+    _overall_avg_service.resize(_classes, 0.0);
+    _overall_max_service.resize(_classes, 0.0);
 
 
     if(_pair_stats){
@@ -600,6 +615,11 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
         _stats[tmp_name.str()] = _nlat_stats[c];
         tmp_name.str("");
 
+        tmp_name << "inter_nlat_stat_" << c;
+        _inter_nlat_stats[c] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
+        _stats[tmp_name.str()] = _inter_nlat_stats[c];
+        tmp_name.str("");
+
         tmp_name << "flat_stat_" << c;
         _flat_stats[c] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
         _stats[tmp_name.str()] = _flat_stats[c];
@@ -619,6 +639,11 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
         tmp_name << "read_plat_stat_" << c;
         _read_plat_stats[c] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
         _stats[tmp_name.str()] = _read_plat_stats[c];
+        tmp_name.str("");
+
+        tmp_name << "small_read_plat_stat_" << c;
+        _small_read_plat_stats[c] = new Stats( this, tmp_name.str( ), 1.0, 3000 );
+        _stats[tmp_name.str()] = _small_read_plat_stats[c];
         tmp_name.str("");
 
         tmp_name << "write_plat_stat_" << c;
@@ -665,6 +690,11 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
         tmp_name << "ewlat_stat_" << c;
         _ewlat_stats[c] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
         _stats[tmp_name.str()] = _ewlat_stats[c];
+        tmp_name.str("");
+
+        tmp_name << "service_stat_" << c;
+        _service_stats[c] = new Stats( this, tmp_name.str( ), 1.0, 1000 );
+        _stats[tmp_name.str()] = _service_stats[c];
         tmp_name.str("");
 
         if(_pair_stats){
@@ -759,22 +789,7 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
 
     _slowest_flit.resize(_classes, -1);
     _slowest_packet.resize(_classes, -1);
-
-    // HANS: Active node configuration
-    /*
-    _num_active_concentration = config.GetInt("active_concentration");
-    if (_num_active_concentration <= 0)  _num_active_concentration = gC;
-
-    _num_compute_nodes = config.GetInt("compute_nodes");
-    int compute_node_per_router = _num_compute_nodes / gK; // HANS: Only applies to fat-tree
-    // if (_num_compute_nodes < 0) _num_compute_nodes = _nodes;
-
-    _num_memory_nodes = config.GetInt("memory_nodes");
-    // if (_num_memory_nodes < 0) _num_compute_nodes = _nodes;
-
-    assert(_num_compute_nodes > 0);
-    assert(_num_memory_nodes >= 0);
-    assert((_num_compute_nodes + _num_memory_nodes) == _nodes);
+    _longest_service_time.resize(_classes, -1);
 
     // THO: Compute and memory node selection
     /*
@@ -809,18 +824,6 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
         assert(memory_node >= 0);
     }
     */
-
-    // HANS: Manual compute and memory node selection
-    // 1. Clustered
-    // vector<int> temp_comp;
-    // for (int iter = 0; iter < 12; iter++){
-    //     temp_comp.push_back(iter);
-    // }
-
-    // vector<int> temp_mem  = {};
-    // for (int iter = 12; iter < 16; iter++){
-    //     temp_mem.push_back(iter);
-    // }
 
     bool _hs_send_all = false;
 
@@ -884,48 +887,45 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     // THO: Use parameters to choose node
     _num_compute_nodes = config.GetInt("compute_nodes");
     _num_memory_nodes = config.GetInt("memory_nodes");
-    vector<int> temp_comp;
-    vector<int> temp_mem;
-    // 1. Clustered or No compute-memory
-    // for (int c = 0; c < _num_compute_nodes; c++)
-    //     temp_comp.push_back(c);
+    set<int> temp_comp;
+    set<int> temp_mem;
+    // 1. Clustered compute-memory
+    for (int c = 0; c < _num_compute_nodes; c++)
+        temp_comp.insert(c);
 
-    // for (int m = 0; m < _num_memory_nodes; m++)
-    //     temp_mem.push_back(_nodes - m);
-    // vector<int> temp_comp = {0, 1, 2, 3};
-    // vector<int> temp_mem  = {4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+    for (int m = 0; m < _num_memory_nodes; m++)
+        temp_mem.insert(_nodes - m - 1);
 
-    // vector<int> temp_comp = {4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-    // vector<int> temp_mem  = {0, 1, 2, 3};
+    // 2. Interleaved compute-memory
+    // assert(_num_memory_nodes % gK == 0);    // Tho: For now, only support mem at every router for evaluation fairness
+    // assert(_num_compute_nodes % gK == 0);   // Tho: For now, only support mem at every router for evaluation fairness
+    // int compute_node = 0;
+    // while (temp_comp.size() < _num_compute_nodes) {
+    //     temp_comp.insert(compute_node);
+    //     compute_node = (compute_node > (_nodes - gK - 1)) ? compute_node - (_nodes - gK - 1) : compute_node + gK;
+    // }
+    // int memory_node = _nodes - 1;
+    // while (temp_mem.size() < _num_memory_nodes) {
+    //     temp_mem.insert(memory_node);
+    //     memory_node = (memory_node < gK) ? memory_node + (_nodes - gK - 1) : memory_node - gK;
+    // }
 
-    // 2. Interleaved
-    assert(_num_memory_nodes % gK == 0);    // Tho: For now, only support mem at every router for evaluation fairness
-    assert(_num_compute_nodes % gK == 0);   // Tho: For now, only support mem at every router for evaluation fairness
-    int compute_node = 0;
-    while (temp_comp.size() < _num_compute_nodes) {
-        temp_comp.push_back(compute_node);
-        compute_node = (compute_node > (_nodes - gK - 1)) ? compute_node - (_nodes - gK - 1) : compute_node + gK;
-    }
-    int memory_node = _nodes - 1;
-    while (temp_mem.size() < _num_memory_nodes) {
-        temp_mem.push_back(memory_node);
-        memory_node = (memory_node < gK) ? memory_node + (_nodes - gK - 1) : memory_node - gK;
-    }
-    // vector<int> temp_comp = {0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14};
-    // vector<int> temp_mem  = {3, 7, 11, 15};
+    // int num_interleave = _num_memory_nodes / gK;    // No. of memory nodes connected to each router
+    // int mem_node = RandomInt(gK-1);
+    // for (int inter_no = 0; inter_no < gK; inter_no++) {
+    //     while (temp_mem.size() < num_interleave*(inter_no+1)) {
+    //         temp_mem.insert(inter_no*gK + mem_node);
+    //         mem_node = RandomInt(gK-1);
+    //     }
+    // }
 
-    // vector<int> temp_comp = {1, 2, 3, 4, 6, 7, 8, 9, 11, 12, 13, 14};
-    // vector<int> temp_mem  = {0, 5, 10, 15};
+    // for (int compute_node = 0; compute_node < _nodes; compute_node++) {
+    //     if (temp_mem.count(compute_node) == 0)
+    //         temp_comp.insert(compute_node);
+    // }
 
-    // 3. No compute-memory
-    // vector<int> temp_comp = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-    // vector<int> temp_mem  = {};
-
-
-    set<int> temp_set_comp(temp_comp.begin(), temp_comp.end());
-    set<int> temp_set_mem (temp_mem.begin(),  temp_mem.end());
-    _compute_nodes = temp_set_comp;
-    _memory_nodes  = temp_set_mem;
+    _compute_nodes = temp_comp;
+    _memory_nodes  = temp_mem;
     cout << "Compute: " << _compute_nodes.size() << ", memory: " << _memory_nodes.size() << endl; 
     assert((_compute_nodes.size() + _memory_nodes.size()) == _nodes);
 }
@@ -942,12 +942,14 @@ TrafficManager::~TrafficManager( )
     for ( int c = 0; c < _classes; ++c ) {
         delete _plat_stats[c];
         delete _nlat_stats[c];
+        delete _inter_nlat_stats[c];
         delete _flat_stats[c];
         delete _frag_stats[c];
         delete _hop_stats[c];
 
         // HANS: Additionals for reordering latency
         delete _read_plat_stats[c];
+        delete _small_read_plat_stats[c];
         delete _write_plat_stats[c];
         delete _read_nlat_stats[c];
         delete _write_nlat_stats[c];
@@ -957,6 +959,7 @@ TrafficManager::~TrafficManager( )
         // delete _rcount_stats[c];
         delete _uplat_stats[c];
         delete _ewlat_stats[c];
+        delete _service_stats[c];
 
         delete _traffic_pattern[c];
         delete _injection_process[c];
@@ -1045,12 +1048,24 @@ void TrafficManager::_RetireFlit( Flit *f, int dest )
     // HANS: Additionals for recordering endpoint waiting time
     if (f->head){
         if ((f->src / gC) != (f->dest / gC)){
+            // if (f->uptime == 450)
+            //     cout << "---------------------------------- f->id: " << f->id << endl;
             _uplat_stats[f->cl]->AddSample( f->uptime );
 
             // if ((f->src / gC) == 0)
                 // cout << GetSimTime() << "- Uptime: " << f->uptime << ", fID: " << f->id << endl;
         }
         _ewlat_stats[f->cl]->AddSample( f->ewtime );
+
+        if((_longest_service_time[f->cl] < 0) || (_service_stats[f->cl]->Max() < (f->service_time)))
+            _longest_service_time[f->cl] = f->id;
+        _service_stats[f->cl]->AddSample( f->service_time );
+
+        int service_class_idx = (f->service_time / f->hops) / _resolution;
+        if (service_class_idx > (_num_cell - 1))   service_class_idx = _num_cell - 1;
+        if ((f->src / gC) != (f->dest / gC)){
+            _service_class[service_class_idx]++;
+        }
     }
 
     // HANS: Additionals for recording reordering latency
@@ -1148,7 +1163,14 @@ void TrafficManager::_RetireFlit( Flit *f, int dest )
                (_plat_stats[f->cl]->Max() < (f->atime - head->ctime)))
                 _slowest_packet[f->cl] = f->pid;
             _plat_stats[f->cl]->AddSample( f->atime - head->ctime);
+            // if ((f->atime - head->ctime) == 107220)
+            // if ((f->atime - head->ctime) > 1000)
+            //     cout << "------------------------ packet id: " << f->pid << ", latency: " << f->atime - head->ctime << endl;
             _nlat_stats[f->cl]->AddSample( f->atime - head->itime);
+            if ((f->src / gC) != (f->dest / gC))
+                _inter_nlat_stats[f->cl]->AddSample( f->atime - head->itime);
+            // if ((f->src / gC) == (f->dest / gC))
+            //     cout << "src: " << f->src << ", dest: " << f->dest << ", record nlat = " << f->atime - head->itime << endl;
             _frag_stats[f->cl]->AddSample( (f->atime - head->atime) - (f->id - head->id) );
 
             if(_pair_stats){
@@ -1175,6 +1197,8 @@ void TrafficManager::_RetireFlit( Flit *f, int dest )
             if ((f->type == Flit::READ_REQUEST) || (f->type == Flit::READ_REPLY)){
                 _read_plat_stats[f->cl]->AddSample( f->atime - head->ctime);
                 _read_nlat_stats[f->cl]->AddSample( f->atime - head->itime);
+                if ((f->is_small) && (f->type == Flit::READ_REPLY) && ((f->src / gC) != (f->dest / gC)))
+                    _small_read_plat_stats[f->cl]->AddSample( f->atime - head->itime);
             } else if ((f->type == Flit::WRITE_REQUEST) || (f->type == Flit::WRITE_REPLY)) {
                 _write_plat_stats[f->cl]->AddSample( f->atime - head->ctime);
                 _write_nlat_stats[f->cl]->AddSample( f->atime - head->itime);
@@ -1345,10 +1369,10 @@ void TrafficManager::_GeneratePacket( int source, int stype,
 #endif
 
         // HANS: For debugging
-        // int pkt_watch_id = 187;
-        // if (f->pid == pkt_watch_id) f->watch = true;
+        int pkt_watch_id = 126719;
+        if (f->pid == pkt_watch_id) f->watch = true;
 
-        // int flit_watch_id = 5870;
+        // int flit_watch_id = 113200;
         // if (f->id == flit_watch_id) f->watch = true;
 
         switch( _pri_type ) {
@@ -1804,17 +1828,20 @@ void TrafficManager::_ClearStats( )
 {
     _slowest_flit.assign(_classes, -1);
     _slowest_packet.assign(_classes, -1);
+    _longest_service_time.assign(_classes, -1);
 
     for ( int c = 0; c < _classes; ++c ) {
 
         _plat_stats[c]->Clear( );
         _nlat_stats[c]->Clear( );
+        _inter_nlat_stats[c]->Clear( );
         _flat_stats[c]->Clear( );
 
         _frag_stats[c]->Clear( );
 
         // HANS: Additionals for reordering latency
         _read_plat_stats[c]->Clear();
+        _small_read_plat_stats[c]->Clear();
         _write_plat_stats[c]->Clear();
         _read_nlat_stats[c]->Clear();
         _write_nlat_stats[c]->Clear();
@@ -1824,6 +1851,7 @@ void TrafficManager::_ClearStats( )
         // _rcount_stats[c]->Clear();
         _uplat_stats[c]->Clear();
         _ewlat_stats[c]->Clear();
+        _service_stats[c]->Clear();
 
         _sent_packets[c].assign(_nodes, 0);
         _accepted_packets[c].assign(_nodes, 0);
@@ -2227,6 +2255,9 @@ void TrafficManager::_UpdateOverallStats() {
         _overall_min_nlat[c] += _nlat_stats[c]->Min();
         _overall_avg_nlat[c] += _nlat_stats[c]->Average();
         _overall_max_nlat[c] += _nlat_stats[c]->Max();
+        _overall_min_inter_nlat[c] += _inter_nlat_stats[c]->Min();
+        _overall_avg_inter_nlat[c] += _inter_nlat_stats[c]->Average();
+        _overall_max_inter_nlat[c] += _inter_nlat_stats[c]->Max();
         _overall_min_flat[c] += _flat_stats[c]->Min();
         _overall_avg_flat[c] += _flat_stats[c]->Average();
         _overall_max_flat[c] += _flat_stats[c]->Max();
@@ -2239,6 +2270,10 @@ void TrafficManager::_UpdateOverallStats() {
         _overall_min_read_plat[c] += _read_plat_stats[c]->Min();
         _overall_avg_read_plat[c] += _read_plat_stats[c]->Average();
         _overall_max_read_plat[c] += _read_plat_stats[c]->Max();
+
+        _overall_min_small_read_plat[c] += _small_read_plat_stats[c]->Min();
+        _overall_avg_small_read_plat[c] += _small_read_plat_stats[c]->Average();
+        _overall_max_small_read_plat[c] += _small_read_plat_stats[c]->Max();
 
         _overall_min_write_plat[c] += _write_plat_stats[c]->Min();
         _overall_avg_write_plat[c] += _write_plat_stats[c]->Average();
@@ -2275,6 +2310,10 @@ void TrafficManager::_UpdateOverallStats() {
         _overall_min_ewlat[c] += _ewlat_stats[c]->Min();
         _overall_avg_ewlat[c] += _ewlat_stats[c]->Average();
         _overall_max_ewlat[c] += _ewlat_stats[c]->Max();
+
+        _overall_min_service[c] += _service_stats[c]->Min();
+        _overall_avg_service[c] += _service_stats[c]->Average();
+        _overall_max_service[c] += _service_stats[c]->Max();
 
         _overall_hop_stats[c] += _hop_stats[c]->Average();
         int count_min, count_sum, count_max;
@@ -2363,10 +2402,16 @@ void TrafficManager::WriteStats(ostream & os) const {
            << "plat_hist(" << c+1 << ",:) = " << *_plat_stats[c] << ";" << endl
            << "nlat(" << c+1 << ") = " << _nlat_stats[c]->Average() << ";" << endl
            << "nlat_hist(" << c+1 << ",:) = " << *_nlat_stats[c] << ";" << endl
+           << "inter_nlat(" << c+1 << ") = " << _inter_nlat_stats[c]->Average() << ";" << endl
+           << "inter_nlat_hist(" << c+1 << ",:) = " << *_inter_nlat_stats[c] << ";" << endl
            << "flat(" << c+1 << ") = " << _flat_stats[c]->Average() << ";" << endl
            << "flat_hist(" << c+1 << ",:) = " << *_flat_stats[c] << ";" << endl
            << "frag_hist(" << c+1 << ",:) = " << *_frag_stats[c] << ";" << endl
            << "hops(" << c+1 << ",:) = " << *_hop_stats[c] << ";" << endl;
+        if (_use_read_write[c]) {
+            os << "small_read_plat(" << c+1 << ") = " << _small_read_plat_stats[c]->Average() << ";" << endl
+               << "small_read_plat(" << c+1 << ",:) = " << *_small_read_plat_stats[c] << ";" << endl;
+        }
         if(_pair_stats){
             os<< "pair_sent(" << c+1 << ",:) = [ ";
             for(int i = 0; i < _nodes; ++i) {
@@ -2559,6 +2604,7 @@ void TrafficManager::DisplayStats(ostream & os) const {
             << "\tminimum = " << _flat_stats[c]->Min() << endl
             << "\tmaximum = " << _flat_stats[c]->Max() << endl
             << "Slowest flit = " << _slowest_flit[c] << endl
+            << "Flit with longest service time = " << _longest_service_time[c] << endl
             << "Fragmentation average = " << _frag_stats[c]->Average() << endl
             << "\tminimum = " << _frag_stats[c]->Min() << endl
             << "\tmaximum = " << _frag_stats[c]->Max() << endl;
@@ -2569,6 +2615,10 @@ void TrafficManager::DisplayStats(ostream & os) const {
             << "Read packet latency average = " << _read_plat_stats[c]->Average() << endl
             << "\tminimum = " << _read_plat_stats[c]->Min() << endl
             << "\tmaximum = " << _read_plat_stats[c]->Max() << endl
+
+            << "SMALL Read packet latency average = " << _small_read_plat_stats[c]->Average() << endl
+            << "\tminimum = " << _small_read_plat_stats[c]->Min() << endl
+            << "\tSmall Read maximum = " << _small_read_plat_stats[c]->Max() << endl
 
             << "Write packet latency average = " << _write_plat_stats[c]->Average() << endl
             << "\tminimum = " << _write_plat_stats[c]->Min() << endl
@@ -2613,6 +2663,11 @@ void TrafficManager::DisplayStats(ostream & os) const {
             << "Endpoint waiting time average = " << _ewlat_stats[c]->Average() << endl
             << "\tminimum = " << _ewlat_stats[c]->Min() << endl
             << "\tmaximum = " << _ewlat_stats[c]->Max() << endl;
+
+        cout
+            << "Service time average = " << _service_stats[c]->Average() << endl
+            << "\tminimum = " << _service_stats[c]->Min() << endl
+            << "\tmaximum = " << _service_stats[c]->Max() << endl;
 
         // HANS: Additionals for request-reply traffic
 
@@ -2716,14 +2771,14 @@ void TrafficManager::DisplayOverallStats( ostream & os ) const {
            << " (" << _total_sims << " samples)" << endl;
         os << "\tminimum = " << _overall_min_plat[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
-        os << "\tmaximum = " << _overall_max_plat[c] / (double)_total_sims
+        os << "\tPacket maximum = " << _overall_max_plat[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
 
         os << "Network latency average = " << _overall_avg_nlat[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
         os << "\tminimum = " << _overall_min_nlat[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
-        os << "\tmaximum = " << _overall_max_nlat[c] / (double)_total_sims
+        os << "\tNetwork maximum = " << _overall_max_nlat[c] / (double)_total_sims
            << " (" << _total_sims << " samples)" << endl;
 
         os << "Flit latency average = " << _overall_avg_flat[c] / (double)_total_sims
@@ -2876,11 +2931,13 @@ void TrafficManager::DisplayOverallStats( ostream & os ) const {
         os << "*** OVERALL UPLINK CHANNEL UTILIZATION ***" << endl;
         for (int i = 0; i < (_num_channels / 2); i++){
             os << _overall_min_chanutil[s][i] << "\t" << _overall_avg_chanutil[s][i] << "\t" << _overall_max_chanutil[s][i] << endl;
+            os << "uplink haha = " << _overall_avg_chanutil[s][i] << endl;
         }
 
         os << "*** OVERALL DOWNLINK CHANNEL UTILIZATION ***" << endl;
         for (int i = (_num_channels / 2); i < _num_channels; i++){
             os << _overall_min_chanutil[s][i] << "\t" << _overall_avg_chanutil[s][i] << "\t" << _overall_max_chanutil[s][i] << endl;
+            os << "downlink haha = " << _overall_avg_chanutil[s][i] << endl;
         }
         os << "*** END ***" << endl << endl;
     }
