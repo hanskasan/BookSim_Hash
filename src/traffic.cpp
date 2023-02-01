@@ -94,6 +94,8 @@ TrafficPattern * TrafficPattern::New(string const & pattern, int nodes,
     result = new RandomPermutationTrafficPattern(nodes, perm_seed);
   } else if(pattern_name == "uniform") {
     result = new UniformRandomTrafficPattern(nodes);
+  } else if(pattern_name == "uniform_inter") {
+    result = new UniformRandomInterTrafficPattern(nodes);
   } else if(pattern_name == "uniform_fat") {
     int fat_ratio = config->GetInt("fat_ratio");
     result = new UniformRandomFatTrafficPattern(nodes, fat_ratio);
@@ -102,7 +104,8 @@ TrafficPattern * TrafficPattern::New(string const & pattern, int nodes,
   } else if (pattern_name == "randperm_sel") {
     result = new PermRandomSelectiveTrafficPattern(nodes);
   } else if (pattern_name == "groupperm") {
-    result = new PermGroupSelectiveTrafficPattern(nodes);
+    int perm_elem = config->GetInt("perm_elem");
+    result = new PermGroupSelectiveTrafficPattern(nodes, perm_elem);
   } else if (pattern_name == "adversarial_sel") {
     result = new AdversarialRandomSelectiveTrafficPattern(nodes);
   } else if(pattern_name == "modulo_worst") {
@@ -449,6 +452,22 @@ int UniformRandomTrafficPattern::dest(int source)
   return RandomInt(_nodes - 1);
 }
 
+UniformRandomInterTrafficPattern::UniformRandomInterTrafficPattern(int nodes)
+  : RandomTrafficPattern(nodes)
+{
+
+}
+
+int UniformRandomInterTrafficPattern::dest(int source)
+{
+  assert((source >= 0) && (source < _nodes));
+  int dest = RandomInt(_nodes - 1);
+  while ((source / gK) == (dest / gK)) {
+    dest = RandomInt(_nodes - 1);
+  }
+  return dest;
+}
+
 UniformRandomFatTrafficPattern::UniformRandomFatTrafficPattern(int nodes, int fat_ratio)
   : RandomTrafficPattern(nodes)
 {
@@ -486,26 +505,11 @@ int UniformRandomSelectiveTrafficPattern::dest(int source)
   // THO: Select destination only from _memory_nodes
   int rand_dest = RandomInt(_nodes-1);
   while(_memory_nodes.count(rand_dest) == 0) {
+  // while(_compute_nodes.count(rand_dest) == 0) {
     rand_dest = RandomInt(_nodes-1);
   }
 
   return rand_dest;
-
-  // // HANS: Select destination only from _memory_nodes
-  // int rand = RandomInt(_memory_nodes.size() - 1);
-  // set<int>::iterator temp = _memory_nodes.begin();
-  // for (int iter = 0; iter < rand; iter++){
-  //   temp++;
-  // }
-
-  // return rand_dest;
-  // HANS: Select destination only from _memory_nodes
-  // int rand = RandomInt(_memory_nodes.size() - 1);
-  // set<int>::iterator temp = _memory_nodes.begin();
-  // for (int iter = 0; iter < rand; iter++){
-  //   temp++;
-  // }
-  // return *temp;
 }
 
 UniformRandomInterRouterTrafficPattern::UniformRandomInterRouterTrafficPattern(int nodes)
@@ -523,7 +527,8 @@ int UniformRandomInterRouterTrafficPattern::dest(int source)
   return dest;
 }
 
-// THO: Select destination using _active_nodes (AD)
+// THO: Select destination using _compute_nodes (AD)
+//      Use for Interleaved nodes
 AdversarialRandomSelectiveTrafficPattern::AdversarialRandomSelectiveTrafficPattern(int nodes)
   : RandomTrafficPattern(nodes)
 {
@@ -533,17 +538,16 @@ int AdversarialRandomSelectiveTrafficPattern::dest(int source)
 {
   assert((source >= 0) && (source < _nodes));
   assert((_nodes % gK) == 0);
-  // assert(_compute_nodes.count(source));
+  assert(_compute_nodes.count(source));
 
   int const src_router = source/gK;
-  // Change this dest_router if running clustered
   int const dest_router = (src_router + 1) * gK;
 
   int dest = (dest_router + RandomInt(gK - 1)) % _nodes;
 
-  // while(_compute_nodes.count(dest) != 0) {
-  //   dest = (dest_router + RandomInt(gK - 1)) % _nodes;
-  // }
+  while(_compute_nodes.count(dest) != 0) {
+    dest = (dest_router + RandomInt(gK - 1)) % _nodes;
+  }
 
   return dest;
 }
@@ -587,9 +591,9 @@ int AdversarialRandomSelectiveTrafficPattern::dest(int source)
 
 
 // THO: PERM but each source has a list of destinations instead of only 1 (*All equal nodes*)
-//      *This traffic is not completely load balanced
-PermGroupSelectiveTrafficPattern::PermGroupSelectiveTrafficPattern(int nodes)
-  : RandomTrafficPattern(nodes)
+//      *This traffic is load balanced
+PermGroupSelectiveTrafficPattern::PermGroupSelectiveTrafficPattern(int nodes, int perm_elem)
+  : RandomTrafficPattern(nodes), _list_size(perm_elem)
 {
 }
 
@@ -603,11 +607,12 @@ int PermGroupSelectiveTrafficPattern::dest(int source)
     cout << "GroupPerm trafic: " << endl;
     _dest_vec.resize(_nodes);
     for (int src = 0; src < _nodes; src++) {
-      int _list_size = 5; // Fixed number of destination
-      // int _list_size = RandomInt(_nodes - 1);  // Random number of destination
-      while (_list_size == 0) {
-        _list_size = RandomInt(_nodes - 1);
+      // int list_size = _list_size;   // Use this for fixed number of destinations
+      int list_size = RandomInt(_list_size);  // Use this for random number of destination
+      while (list_size == 0) {
+        list_size = RandomInt(_list_size);
       }
+      // cout << "Src: " << src << ", Number of destinations: " << _list_size << endl;
       // // Use this part to have duplicate elements (traffic has weights)
       // for (int i = 0; i < _list_size; i++) {
       //   int temp_dest = RandomInt(_nodes - 1);
@@ -618,12 +623,13 @@ int PermGroupSelectiveTrafficPattern::dest(int source)
       //   for (int i = 0; i < _nodes; i++)
       //     _cyclic_dest.push_back(i);
       // }
-      while (_dest_vec[src].size() < _list_size) {
+      while (_dest_vec[src].size() < list_size) {
         if (_cyclic_dest.empty()) {
           for (int i = 0; i < _nodes; i++)
             _cyclic_dest.push_back(i);
         }
 
+        // The use of "_cyclic_dest" helps create load-balance (every destination is chosen equally)
         int temp_dest = RandomInt(_cyclic_dest.size() - 1);
         _dest_vec[src].push_back(_cyclic_dest[temp_dest]);
         int size_before = _dest_vec[src].size();
@@ -635,7 +641,6 @@ int PermGroupSelectiveTrafficPattern::dest(int source)
         if (size_after == size_before) {
           swap(_cyclic_dest[temp_dest], _cyclic_dest[_cyclic_dest.size() - 1]);
           _cyclic_dest.pop_back();
-          cout << "  Pop!!!";
         }
       }
       cout << "  Nodes " << src << ":";

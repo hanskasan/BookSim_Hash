@@ -125,6 +125,12 @@ public:
   virtual int dest(int source);
 };
 
+class UniformRandomInterTrafficPattern : public RandomTrafficPattern {
+public:
+  UniformRandomInterTrafficPattern(int nodes);
+  virtual int dest(int source);
+};
+
 class UniformRandomFatTrafficPattern : public RandomTrafficPattern {
 public:
   UniformRandomFatTrafficPattern(int nodes, int fat_ratio);
@@ -174,13 +180,13 @@ public:
 // THO: Group Permutation
 class PermGroupSelectiveTrafficPattern : public RandomTrafficPattern {
 private:
-  // int                  _selection;  // Number of selection for destination
+  int                  _list_size;  // Number of selection for destination
   vector<int>          _dest;
   vector<int>          _cyclic_dest;
   vector<set<int> >    _dest_set;   // Unique set -> all sources have same no. of destinations
   vector<vector<int> > _dest_vec;   // Not unique -> Some sources will have more destinations
 public:
-  PermGroupSelectiveTrafficPattern(int nodes);
+  PermGroupSelectiveTrafficPattern(int nodes, int perm_elem);
   virtual int dest(int source);
 };
 
