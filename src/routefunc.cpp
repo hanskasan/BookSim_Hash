@@ -1978,6 +1978,9 @@ void fattree_nca_hybrid( const Router *r, const Flit *f,
       //ejection
       if(router_depth == gN-1){
         out_port = dest%gK;
+	if (in_channel < gK) {
+          r->inc_hash++;
+        }
       } else {	
         //find the down port for the destination
         int router_branch_coverage = powi(gK, gN-(router_depth+1)); 
@@ -1987,63 +1990,35 @@ void fattree_nca_hybrid( const Router *r, const Flit *f,
       //up ports are numbered last
       assert(in_channel < gK); //came from a up channel
 
-      int port1 = gK + (f->src % gK);   // Source hashing port
-      // int port1 = gK + (f->dest % gK);  // Destination hashing port
-      int port2 = gK + RandomInt(gK-1);  // Random port
-      // int port2 = gK + ((f->src + (f->dest / gK)) % gK);  // A port
-      // int port2 = gK + r->GetRROffset();  // RR port
-      // r->IncrementRROffset(gK);           // RR port
-      // int port3 = gK + (f->src % gK);   // Source hashing port
+      // int port1 = gK + (in_channel % gC);   // Source hashing port
+      int port1 = gK + (f->dest % gC);  // Destination hashing 
+      // int port1 = gK + (int(f->dest / pow(log2(gK),2*(gN-router_depth-1))) % gC); // Only work with k >= 4
+      // int port1 = gK + RandomInt(gK-1);  // Random port
+      // int port2 = gK + RandomInt(gK-1);  // Random port
+
+
+      // int key = (gK * (r->offset / r->active_node_total)) + f->src;
+      // int key = (gK * (r->offset / gK)) + f->src;
+      // int key = (gK * (r->offset / gK)) + (r->GetID() - gK)*gK + in_channel;
+      int key = r->random_offset + (r->GetID() - gK)*gK + ((in_channel + r->random_src_offset) % gK);
+
+
+      unsigned long fibonacci_mult = 11400714819323198485;  // uint64_t gives same results
+      int port2 = gK + ((unsigned long)(key * fibonacci_mult) >> 60);
+
+      r->inc_hash++;
+      
+      int threshold = 0;
 
       // Switching scheme #1
       // if (r->GetUsedCredit(port1) > r->GetUsedCredit(port2)) {
-      //   out_port = port2;
-      // } else {
-      //   out_port = port1;
-      // }
-
-
-      // Switching scheme #2
-      if (!r->switch_flag[f->src % gK]) {
-        if (r->GetUsedCredit(port1) > (r->GetUsedCredit(port2) + 16)) {
-          out_port = port2;
-          r->switch_flag[f->src % gK] = true;
-          cout << GetSimTime() << " [A->B] Switch from port " << port1 << " (" << r->GetUsedCredit(port1) << ") to port " << port2 << " (" << r->GetUsedCredit(port2) << ")" << endl;
-        } else {
-          out_port = port1;
-          r->switch_flag[f->src % gK] = false;
-        }
+      if ((r->GetUsedCredit(port1) + r->flit_count[port1]) > (r->GetUsedCredit(port2) + r->flit_count[port2] + threshold)) {
+        out_port = port2;
       } else {
-        if (r->GetUsedCredit(port2) > (r->GetUsedCredit(port1) + 16)) {
-          out_port = port1;
-          r->switch_flag[f->src % gK] = false;
-          cout << GetSimTime() << " [B->A] Switch from port " << port2 << " (" << r->GetUsedCredit(port2) << ") to port " << port1 << " (" << r->GetUsedCredit(port1) << ")" << endl;
-        } else {
-          out_port = port2;
-          r->switch_flag[f->src % gK] = true;
-        }  
+        out_port = port1;
       }
-
-
-      // Switching scheme #3
-      // if (!r->switch_flag[f->src % gK]) {
-      //   if (r->IsVCFull(port1, vcBegin)) {
-      //     out_port = port2;
-      //     r->switch_flag[f->src % gK] = true;
-      //   } else {
-      //     out_port = port1;
-      //     r->switch_flag[f->src % gK] = false;
-      //   }
-      // } else {
-      //   if (r->IsVCFull(port2, vcBegin)) {
-      //     out_port = port1;
-      //     r->switch_flag[f->src % gK] = false;
-      //   } else {
-      //     out_port = port2;
-      //     r->switch_flag[f->src % gK] = true;
-      //   }
-      // }
     }
+    // r->committed_packet.push_back(make_pair(out_port, f->packet_size));
   }
   outputs->Clear( );
   
