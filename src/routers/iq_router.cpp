@@ -226,6 +226,8 @@ IQRouter::IQRouter( Configuration const & config, Module *parent,
   switch_flag.resize(gC, false);
 
   dest_list.resize(gC);   // List of destination for each source
+
+  flit_count.resize(_outputs, 0);
   
 }
 
@@ -652,6 +654,7 @@ void IQRouter::_RouteUpdate( )
 {
   assert(_routing_delay);
 
+  // committed_packet.clear();
   while(!_route_vcs.empty()) {
 
     pair<int, pair<int, int> > const & item = _route_vcs.front();
@@ -705,6 +708,19 @@ void IQRouter::_RouteUpdate( )
     }
 
   }
+  // offset += inc_hash;
+
+  if ((offset / gK) != packet_cnt_check) {
+    random_offset = random_offset + (GetSimTime() % gK);
+    random_src_offset = GetSimTime() % gK;
+  }
+  packet_cnt_check = offset / gK;
+
+  // for(int i = 0; i < committed_packet.size(); i++)
+  // {
+  //   flit_count[committed_packet[i].first] += committed_packet[i].second;
+  // }
+  // committed_packet.clear();
 }
 
 
@@ -2159,6 +2175,11 @@ void IQRouter::_SWAllocUpdate( )
       }
 
       cur_buf->RemoveFlit(vc);
+
+      if (f->head)
+        flit_count[output] += f->packet_size;
+      flit_count[output]--;
+      assert(flit_count[output] >= 0);
 
       // if ((this->GetID() == 6) && (input == 15)){
       //   cout << GetSimTime() << " - Remove flit " << f->id << endl;
