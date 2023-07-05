@@ -138,8 +138,13 @@ public:
   mutable vector<vector<int> >  uplink_spread_list;
   mutable vector<int>           spread_degree;
   mutable vector<int>           spread_pid;
-  mutable int                   packet_cnt;   // Is there any information about message?
+  mutable int                   packet_cnt;
   mutable vector<bool>          switch_flag;
+
+  mutable vector<int>           flit_count;
+  int                           random_offset;
+  int                           random_src_offset;
+  mutable vector<pair<int, int> >  committed_packet;
   
   // HANS: Additionals for hashing
   inline void IncrementRROffset( int max ) const { 
