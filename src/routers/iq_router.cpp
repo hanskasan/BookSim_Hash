@@ -654,7 +654,8 @@ void IQRouter::_RouteUpdate( )
 {
   assert(_routing_delay);
 
-  // committed_packet.clear();
+  inc_hash = 0;
+  // committed_packet.clear();	// THO: Use this for better result
   while(!_route_vcs.empty()) {
 
     pair<int, pair<int, int> > const & item = _route_vcs.front();
@@ -708,7 +709,7 @@ void IQRouter::_RouteUpdate( )
     }
 
   }
-  // offset += inc_hash;
+  offset += inc_hash;
 
   if ((offset / gK) != packet_cnt_check) {
     random_offset = random_offset + (GetSimTime() % gK);
