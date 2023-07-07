@@ -928,6 +928,39 @@ TrafficManager::TrafficManager( const Configuration &config, const vector<Networ
     _memory_nodes  = temp_mem;
     cout << "Compute: " << _compute_nodes.size() << ", memory: " << _memory_nodes.size() << endl; 
     assert((_compute_nodes.size() + _memory_nodes.size()) == _nodes);
+
+    // // Error links, cannot route using these links
+    // // set<int> faulty_links;
+    // int temp_link = RandomInt(gK-1);
+    // // 8 error links
+    // for (int e = 0; e < 8; e++) {
+    //     while (faulty_links_0.size() < 8) {
+    //         faulty_links_0.insert(temp_link);
+    //         temp_link = RandomInt(gK-1);
+    //     }
+    // }
+    // assert(faulty_links_0.size() == 8);
+    // // another 8 error links in the next router
+    // temp_link = RandomInt(gK-1);
+    // for (int e = 0; e < 8; e++) {
+    //     while (faulty_links_1.size() < 8) {
+    //         faulty_links_1.insert(temp_link);
+    //         temp_link = RandomInt(gK-1);
+    //     }
+    // }
+    // assert(faulty_links_1.size() == 8);
+
+    faulty_links_0.clear();
+    faulty_links_1.clear();
+    // cout << "Faulty links for R0 are: ";
+    // for (set<int>::iterator i = faulty_links_0.begin(); i != faulty_links_0.end(); i++) {
+    //     cout << *i << " ";
+    // }
+    // cout << "\nFaulty links for R1 are: ";
+    // for (set<int>::iterator i = faulty_links_1.begin(); i != faulty_links_1.end(); i++) {
+    //     cout << *i << " ";
+    // }
+    // cout << endl;
 }
 
 TrafficManager::~TrafficManager( )
