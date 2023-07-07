@@ -252,6 +252,9 @@ public:
 
   // THO: CYCLIC RANDOM GENERATOR
   virtual int GenerateCyclic(int n, vector<int>& src_avai) const {return -1;}
+  virtual char CRC8(const char *data,int length) const {return 0;}
+  virtual uint16_t crc16(const uint8_t* data, size_t length) const {return 0;}
+  virtual uint16_t crc16_int(uint32_t data) const {return 0;}
 
 };
 
