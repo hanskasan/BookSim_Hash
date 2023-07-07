@@ -717,6 +717,7 @@ void IQRouter::_RouteUpdate( )
   }
   packet_cnt_check = offset / gK;
 
+  // THO: Use this for better result
   // for(int i = 0; i < committed_packet.size(); i++)
   // {
   //   flit_count[committed_packet[i].first] += committed_packet[i].second;
@@ -2178,7 +2179,7 @@ void IQRouter::_SWAllocUpdate( )
       cur_buf->RemoveFlit(vc);
 
       if (f->head)
-        flit_count[output] += f->packet_size;
+        flit_count[output] += f->packet_size; // THO: If using committed_packet, remove this part
       flit_count[output]--;
       assert(flit_count[output] >= 0);
 
