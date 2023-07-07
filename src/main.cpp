@@ -102,6 +102,9 @@ set<int> _hs_dests;
 set<int> _hs_srcs;
 bool _hs_send_all;
 
+set<int> faulty_links_0;
+set<int> faulty_links_1;
+
 
 /////////////////////////////////////////////////////////////////////////////
 
