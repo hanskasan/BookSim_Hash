@@ -65,4 +65,7 @@ extern std::set<int> _hs_dests;
 extern std::set<int> _hs_srcs;
 extern bool _hs_send_all;
 
+extern std::set<int> faulty_links_0;
+extern std::set<int> faulty_links_1;
+
 #endif
