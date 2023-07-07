@@ -2762,3 +2762,49 @@ int IQRouter::GenerateCyclic(int n, vector<int>& src_avai) const{
 
     return num;
 }
+
+// THO: CRC8 for char type
+char IQRouter::CRC8(const char *data,int length) const
+{
+   char crc = 0x00;
+   char extract;
+   char sum;
+   for(int i=0;i<length;i++)
+   {
+      extract = *data;
+      for (char tempI = 8; tempI; tempI--) 
+      {
+         sum = (crc ^ extract) & 0x01;
+         crc >>= 1;
+         if (sum)
+            crc ^= 0xB8;
+         extract >>= 1;
+      }
+      data++;
+   }
+   return crc;
+}
+
+// THO: CRC16 for int type
+uint16_t IQRouter::crc16(const uint8_t* data, size_t length) const {
+  uint16_t crc = 0;
+  const uint16_t CRC16_POLY = 0x1021;
+  // const uint16_t CRC16_POLY = 0xA8F4;
+  for (size_t i = 0; i < length; ++i) {
+    crc ^= (uint16_t)data[i] << 8;
+    for (size_t j = 0; j < 8; ++j) {
+      if (crc & 0x8000) {
+        crc = (crc << 1) ^ CRC16_POLY;
+      } else {
+        crc <<= 1;
+      }
+    }
+  }
+  return crc;
+}
+
+uint16_t IQRouter::crc16_int(uint32_t data) const {
+  uint8_t bytes[4];
+  std::memcpy(bytes, &data, sizeof(data));
+  return crc16(bytes, sizeof(bytes));
+}
