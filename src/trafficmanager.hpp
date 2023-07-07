@@ -266,7 +266,7 @@ protected:
   vector<double> _overall_max_service;
 
   // HANS: Channel utilization statistics
-  static const int _num_channels = 32; // Uplink + downlink
+  static const int _num_channels = 512; // Uplink + downlink
   vector<vector<Stats *> >  _chanutil_stats;     
   vector<vector<Stats *> >  _chanutil_freq_stats;     
   vector<vector<double> > _overall_min_chanutil;  
