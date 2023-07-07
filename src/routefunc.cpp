@@ -2017,6 +2017,21 @@ void fattree_nca_hybrid( const Router *r, const Flit *f,
       } else {
         out_port = port1;
       }
+
+      // Below part re-route whenever the chosen out_port is faulty 
+      // int key_openaddress = key;
+      while (((out_port == gK)   && (faulty_links_0.count(r->GetID() - gK) || faulty_links_0.count(f->dest / gK))) ||
+             ((out_port == gK+1) && (faulty_links_1.count(r->GetID() - gK) || faulty_links_1.count(f->dest / gK))))
+      {
+        assert(0);  // Not using right now
+        // out_port = gK + ((unsigned long)(key_openaddress * fibonacci_mult) >> 60);  // For Fibonacci/Adaptive Hash
+        // key_openaddress = key_openaddress + r->offset + gK;  // For Fibonacci/Adaptive Hash
+        out_port = gK + RandomInt(gK-1);  // For Random/Adaptive(2)
+        // out_port = gK + ((out_port + 1) % gK);  // For deterministic
+      }
+
+      assert(!((out_port == gK)   && (faulty_links_0.count(r->GetID() - gK) || faulty_links_0.count(f->dest / gK))) ||
+              ((out_port == gK+1) && (faulty_links_1.count(r->GetID() - gK) || faulty_links_1.count(f->dest / gK))));
     }
     // r->committed_packet.push_back(make_pair(out_port, f->packet_size));
   }
